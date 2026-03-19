@@ -1,0 +1,120 @@
+:root {
+
+    /* ============================================ */
+    /* 컬러 팔레트 */
+    /* ============================================ */
+
+    /* base color - 기본 컬러  ----------------*/
+
+    /* primary - 포인트 컬러 */
+    --color-primary-100:#011320;
+    --color-primary-90:#002C45;
+    --color-primary-80:#004870;
+    --color-primary-70:#00659B;
+    --color-primary-60:#0083C0;
+    --color-primary-50:#2596D4;
+    --color-primary-40:#43A2DB;
+    --color-primary-30:#7BC0EF;
+    --color-primary-20:#B1DEFE;
+    --color-primary-10:#E3FDFF;
+    --color-primary-5:#f3feff;
+    /* secondary - 세컨더리 컬러 */
+    --color-secondary-100:#00030F;
+    --color-secondary-90:#001024;
+    --color-secondary-80:#002137;
+    --color-secondary-70:#052C43;
+    --color-secondary-60:#193A50;
+    --color-secondary-50:#466073;
+    --color-secondary-40:#879AA7;
+    --color-secondary-30:#ACBAC3;
+    --color-secondary-20:#CFD9E0;
+    --color-secondary-10:#E8F3FB;
+    --color-secondary-5:#f2f8fd;
+    /* gray - 그레이 */
+    --color-gray-100:#0A0A0A;
+    --color-gray-95:#1D1D1D;
+    --color-gray-90:#2A2A2A;
+    --color-gray-85:#303030;
+    --color-gray-80:#4F4F4F;
+    --color-gray-70:#5F5F5F;
+    --color-gray-60:#6F6F6F;
+    --color-gray-50:#999999;
+    --color-gray-40:#A5A5A5;
+    --color-gray-30:#B9B9B9;
+    --color-gray-20:#C9C9C9;
+    --color-gray-15:#D9D9D9;
+    --color-gray-10:#ECECEC;
+    --color-gray-8: #efefef;
+    --color-gray-5: #FAFAFA;
+    --color-gray-0:#FFFFFF;
+    /* blue - 블루 */
+    --color-blue-100:#002758;
+    --color-blue-90:#003F8D;
+    --color-blue-80:#0059C3;
+    --color-blue-70:#0087FF;
+    --color-blue-60:#3598FF;
+    --color-blue-50:#72BAFF;
+    --color-blue-40:#B6DCFF;
+    --color-blue-30:#DAEEFF;
+    --color-blue-20:#EDF7FF;
+    /* red - 레드 */
+    --color-red-100:#500;
+    --color-red-90:#890000;
+    --color-red-80:#BC0000;
+    --color-red-70:#ED0000;
+    --color-red-60:#FF4B3B;
+    --color-red-50:#FF8572;
+    --color-red-40:#FAB5B5;
+    --color-red-30:#FDDFDF;
+    --color-red-20:#FEF1F1;
+    /* green - 그린 */
+    --color-green-100:#003400;
+    --color-green-90:#005400;
+    --color-green-80:#007500;
+    --color-green-70:#009600;
+    --color-green-60:#3EB43C;
+    --color-green-50:#7AD075;
+    --color-green-40:#B0E9AC;
+    --color-green-30:#E3FFE0;
+    --color-green-20:#F0FEEF;
+    /* purple - 보라 */
+    --color-purple-100:#010116;
+    --color-purple-90:#08063C;
+    --color-purple-80:#1B1D75;
+    --color-purple-70:#3B46BE;
+    --color-purple-60:#657AFF;
+    --color-purple-50:#8FA9FF;
+    --color-purple-40:#B4CDFF;
+    --color-purple-30:#D3E6FF;
+    --color-purple-20:#D3E6FF;
+    /* yellow - 노랑 */
+    --color-yellow-100:#363224;
+    --color-yellow-90:#4D4526;
+    --color-yellow-80:#6C5D1A;
+    --color-yellow-70:#947B00;
+    --color-yellow-60:#C2A100;
+    --color-yellow-50:#F7D209;
+    --color-yellow-40:#FFFE6E;
+    --color-yellow-30:#FFFFBC;
+    --color-yellow-20:#FFFFDA;
+    /* brown - 브라운 */
+    --color-brown-100:#1D0E00;
+    --color-brown-90:#3F2100;
+    --color-brown-80:#663500;
+    --color-brown-70:#8D4C00;
+    --color-brown-60:#B16700;
+    --color-brown-50:#CD8800;
+    --color-brown-40:#E4AC56;
+    --color-brown-30:#F7D19B;
+    --color-brown-20:#FFF5D6;
+
+
+    --color-primary: var(--color-primary-50);
+    --color-primary-light: var(--color-primary-10);
+    --color-secondary: var(--color-secondary-70);
+    --color-secondary-light: var(--color-secondary-10);
+
+    --color-black: var(--color-gray-100);
+    --color-white: var(--color-gray-0);
+    --color-gray: var(--color-gray-30);
+    --color-gray-light: var(--color-gray-5);
