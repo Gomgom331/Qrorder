@@ -123,12 +123,12 @@ function Depth3Link({ item }: { item: NavLeaf }) {
     <NavLink
       to={item.path}
       className={({ isActive }) =>
-        `flex items-center gap-2 px-3 py-1.5 text-xs rounded-[3px] mx-1 transition-colors ${
+        `flex items-center gap-2 px-3 py-1.5 text-sm rounded-[3px] mx-1 transition-colors ${
           isActive ? 'text-white bg-[#FF6B2B]' : 'text-slate-500 hover:text-white hover:bg-white/5'
         }`
       }
     >
-      {item.icon && <item.icon size={12} className="shrink-0" />}
+      {item.icon && <item.icon size={14} className="shrink-0" />}
       <span>{item.label}</span>
     </NavLink>
   );
@@ -144,11 +144,11 @@ function Depth2Group({ item }: { item: NavGroup2 }) {
     <div>
       <button
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-[3px] mx-1 transition-colors ${
+        className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-[3px] mx-1 transition-colors ${
           active ? 'text-white/90 bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'
         }`}
       >
-        {item.icon && <item.icon size={12} className="shrink-0" />}
+        {item.icon && <item.icon size={14} className="shrink-0" />}
         <span className="flex-1 text-left">{item.label}</span>
         {open
           ? <ChevronDown size={11} className="opacity-50" />
