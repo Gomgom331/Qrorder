@@ -190,28 +190,115 @@ const INITIAL_MENU_ACCESSES: MenuAccess[] = [
 
 // ─── Page ────────────────────────────────────────────────────────
 
+/** 오늘 날짜를 datetime-local 형식(YYYY-MM-DDTHH:MM)으로 반환 */
+function getTodayEnd(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T23:59`;
+}
+
+/** 오늘로부터 7일 전 00:00을 datetime-local 형식으로 반환 */
+function getWeekAgoStart(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T00:00`;
+}
+
 export function AccessLogInquiry() {
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
+  const [startDateTime, setStartDateTime] = useState(getWeekAgoStart);
+  const [endDateTime, setEndDateTime] = useState(getTodayEnd);
+  const [appliedStart, setAppliedStart] = useState('');
+  const [appliedEnd, setAppliedEnd] = useState('');
+  const [dateRangeError, setDateRangeError] = useState('');
   const [accessLogs] = useState<AccessLog[]>(INITIAL_ACCESS_LOGS);
   const [menuAccesses] = useState<MenuAccess[]>(INITIAL_MENU_ACCESSES);
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
+  /* ── 날짜 범위 유효성 검사 ── */
+  const validateDateRange = (start: string, end: string): boolean => {
+    if (!start || !end) return true;
+    const startMs = new Date(start).getTime();
+    const endMs = new Date(end).getTime();
+    if (endMs < startMs) {
+      setDateRangeError('종료일시는 시작일시보다 이후여야 합니다.');
+      return false;
+    }
+    const diffDays = (endMs - startMs) / (1000 * 60 * 60 * 24);
+    if (diffDays > 7) {
+      setDateRangeError('조회 기간은 최대 1주일(7일)까지 설정할 수 있습니다.');
+      return false;
+    }
+    setDateRangeError('');
+    return true;
+  };
+
+  /* ── 시작일시 변경 시 자동 종료일시 설정 ── */
+  const handleStartDateChange = (value: string) => {
+    setStartDateTime(value);
+    if (value && endDateTime) {
+      validateDateRange(value, endDateTime);
+    } else if (value && !endDateTime) {
+      // 시작일시 + 7일을 종료일시 기본값으로 설정
+      const startMs = new Date(value).getTime();
+      const maxEnd = new Date(startMs + 7 * 24 * 60 * 60 * 1000);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const formatted = `${maxEnd.getFullYear()}-${pad(maxEnd.getMonth() + 1)}-${pad(maxEnd.getDate())}T${pad(maxEnd.getHours())}:${pad(maxEnd.getMinutes())}`;
+      setEndDateTime(formatted);
+      setDateRangeError('');
+    }
+  };
+
+  const handleEndDateChange = (value: string) => {
+    setEndDateTime(value);
+    if (startDateTime) {
+      validateDateRange(startDateTime, value);
+    }
+  };
+
   /* ── 검색 ── */
-  const handleSearch = () => setAppliedSearch(search);
+  const handleSearch = () => {
+    if (!validateDateRange(startDateTime, endDateTime)) return;
+    setAppliedSearch(search);
+    setAppliedStart(startDateTime);
+    setAppliedEnd(endDateTime);
+  };
+
   const handleReset = () => {
     setSearch('');
     setAppliedSearch('');
+    setStartDateTime('');
+    setEndDateTime('');
+    setAppliedStart('');
+    setAppliedEnd('');
+    setDateRangeError('');
     setSelectedLogId(null);
   };
 
-  const filteredLogs = accessLogs.filter((log) =>
-    appliedSearch
+  const filteredLogs = accessLogs.filter((log) => {
+    // 텍스트 검색 필터
+    const textMatch = appliedSearch
       ? log.userId.toLowerCase().includes(appliedSearch.toLowerCase()) ||
         log.userName.includes(appliedSearch) ||
         log.ipAddress.includes(appliedSearch)
-      : true
-  );
+      : true;
+
+    // 날짜 범위 필터
+    let dateMatch = true;
+    if (appliedStart || appliedEnd) {
+      const loginMs = new Date(log.loginTime.replace(' ', 'T')).getTime();
+      if (appliedStart) {
+        dateMatch = dateMatch && loginMs >= new Date(appliedStart).getTime();
+      }
+      if (appliedEnd) {
+        dateMatch = dateMatch && loginMs <= new Date(appliedEnd).getTime();
+      }
+    }
+
+    return textMatch && dateMatch;
+  });
 
   /* ── 선택된 사용자의 메뉴 접근 목록 ── */
   const selectedLog = accessLogs.find((log) => log.id === selectedLogId);
@@ -238,8 +325,9 @@ export function AccessLogInquiry() {
 
       {/* ── 검색 카드 ── */}
       <div className="bg-white rounded-[6px] border border-slate-200 p-4">
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="flex-1">
+        <div className="flex flex-col gap-2.5">
+          {/* Row 1: 텍스트 검색 */}
+          <div className="w-full">
             <InputField
               inputSize="md"
               value={search}
@@ -249,19 +337,57 @@ export function AccessLogInquiry() {
               leftIcon={<Search size={14} />}
             />
           </div>
-          <div className="flex gap-2 shrink-0">
-            <Button variant="outline" size="md" onClick={handleReset}>
-              초기화
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              leftIcon={<Search size={14} />}
-              onClick={handleSearch}
-            >
-              조회
-            </Button>
+
+          {/* Row 2: 날짜 범위 + 버튼 */}
+          <div className="flex flex-wrap items-start gap-2">
+            {/* 날짜 범위 */}
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <div className="flex-1 min-w-[160px]">
+                <InputField
+                  inputSize="md"
+                  type="datetime-local"
+                  value={startDateTime}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  errorText={dateRangeError && startDateTime ? ' ' : undefined}
+                />
+              </div>
+              <span className="text-slate-400 text-sm shrink-0 mt-0.5">~</span>
+              <div className="flex-1 min-w-[160px]">
+                <InputField
+                  inputSize="md"
+                  type="datetime-local"
+                  value={endDateTime}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  errorText={dateRangeError || undefined}
+                />
+              </div>
+            </div>
+
+            {/* 버튼 */}
+            <div className="flex gap-2 shrink-0 mt-0.5">
+              <Button variant="outline" size="md" onClick={handleReset}>
+                초기화
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                leftIcon={<Search size={15} />}
+                onClick={handleSearch}
+              >
+                조회
+              </Button>
+            </div>
           </div>
+
+          {/* 날짜 범위 안내 */}
+          {dateRangeError && (
+            <p className="text-xs text-red-500 -mt-1">{dateRangeError}</p>
+          )}
+          {!dateRangeError && (
+            <p className="text-xs text-slate-400 -mt-1">
+              조회 기간은 최대 1주일(7일)까지 설정할 수 있습니다.
+            </p>
+          )}
         </div>
       </div>
 
