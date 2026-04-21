@@ -129,14 +129,14 @@ function getWeekAgoStart(): string {
 }
 
 export function ChangeHistoryInquiry() {
-  const [changeType, setChangeType] = useState('전체');
+  const [changeType, setChangeType] = useState('');
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [startDateTime, setStartDateTime] = useState(getWeekAgoStart);
   const [endDateTime, setEndDateTime] = useState(getTodayEnd);
   const [appliedStart, setAppliedStart] = useState('');
   const [appliedEnd, setAppliedEnd] = useState('');
-  const [appliedChangeType, setAppliedChangeType] = useState('전체');
+  const [appliedChangeType, setAppliedChangeType] = useState('');
   const [dateRangeError, setDateRangeError] = useState('');
   const [histories] = useState<ChangeHistory[]>(INITIAL_HISTORIES);
 
@@ -190,21 +190,21 @@ export function ChangeHistoryInquiry() {
   };
 
   const handleReset = () => {
-    setChangeType('전체');
+    setChangeType('');
     setSearch('');
     setAppliedSearch('');
     setStartDateTime('');
     setEndDateTime('');
     setAppliedStart('');
     setAppliedEnd('');
-    setAppliedChangeType('전체');
+    setAppliedChangeType('');
     setDateRangeError('');
   };
 
   const filteredHistories = histories.filter((h) => {
     // 변경구분 필터
     const changeTypeMatch =
-      appliedChangeType === '전체' || h.changeType === appliedChangeType;
+      !appliedChangeType || appliedChangeType === '전체' || h.changeType === appliedChangeType;
 
     // 텍스트 검색 필터
     const textMatch = appliedSearch
@@ -250,11 +250,9 @@ export function ChangeHistoryInquiry() {
             <div className="w-full sm:w-48 shrink-0">
               <DropdownSelect
                 inputSize="md"
-                label="변경구분"
-                labelPosition="left"
-                labelWidth="w-16"
+                placeholder="변경구분"
                 value={changeType}
-                onChange={(e) => setChangeType(e.target.value)}
+                onChange={(value) => setChangeType(value)}
                 options={[
                   { value: '전체', label: '전체' },
                   { value: '등록', label: '등록' },
@@ -279,26 +277,20 @@ export function ChangeHistoryInquiry() {
           <div className="flex flex-wrap items-start gap-2">
             {/* 날짜 범위 */}
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="flex-1 min-w-[200px]">
+              <div className="flex-1 min-w-[160px]">
                 <InputField
                   inputSize="md"
                   type="datetime-local"
-                  label="시작일시"
-                  labelPosition="left"
-                  labelWidth="w-16"
                   value={startDateTime}
                   onChange={(e) => handleStartDateChange(e.target.value)}
                   errorText={dateRangeError && startDateTime ? ' ' : undefined}
                 />
               </div>
               <span className="text-slate-400 shrink-0">~</span>
-              <div className="flex-1 min-w-[200px]">
+              <div className="flex-1 min-w-[160px]">
                 <InputField
                   inputSize="md"
                   type="datetime-local"
-                  label="종료일시"
-                  labelPosition="left"
-                  labelWidth="w-16"
                   value={endDateTime}
                   onChange={(e) => handleEndDateChange(e.target.value)}
                   errorText={dateRangeError || undefined}
