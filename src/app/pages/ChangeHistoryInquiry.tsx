@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { InputField } from '../components/ui/InputField';
 import { Button } from '../components/ui/Button';
-import { CheckboxField } from '../components/ui/CheckboxField';
+import { DropdownSelect } from '../components/ui/DropdownSelect';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -113,27 +113,122 @@ const INITIAL_HISTORIES: ChangeHistory[] = [
 
 // ─── Page ────────────────────────────────────────────────────────
 
+/** 오늘 날짜를 datetime-local 형식(YYYY-MM-DDTHH:MM)으로 반환 */
+function getTodayEnd(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T23:59`;
+}
+
+/** 오늘로부터 7일 전 00:00을 datetime-local 형식으로 반환 */
+function getWeekAgoStart(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T00:00`;
+}
+
 export function ChangeHistoryInquiry() {
+  const [changeType, setChangeType] = useState('전체');
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
+  const [startDateTime, setStartDateTime] = useState(getWeekAgoStart);
+  const [endDateTime, setEndDateTime] = useState(getTodayEnd);
+  const [appliedStart, setAppliedStart] = useState('');
+  const [appliedEnd, setAppliedEnd] = useState('');
+  const [appliedChangeType, setAppliedChangeType] = useState('전체');
+  const [dateRangeError, setDateRangeError] = useState('');
   const [histories] = useState<ChangeHistory[]>(INITIAL_HISTORIES);
 
-  /* ── 검색 ── */
-  const handleSearch = () => setAppliedSearch(search);
-  const handleReset = () => {
-    setSearch('');
-    setAppliedSearch('');
+  /* ── 날짜 범위 유효성 검사 ── */
+  const validateDateRange = (start: string, end: string): boolean => {
+    if (!start || !end) return true;
+    const startMs = new Date(start).getTime();
+    const endMs = new Date(end).getTime();
+    if (endMs < startMs) {
+      setDateRangeError('종료일시는 시작일시보다 이후여야 합니다.');
+      return false;
+    }
+    const diffDays = (endMs - startMs) / (1000 * 60 * 60 * 24);
+    if (diffDays > 7) {
+      setDateRangeError('조회 기간은 최대 1주일(7일)까지 설정할 수 있습니다.');
+      return false;
+    }
+    setDateRangeError('');
+    return true;
   };
 
-  const filteredHistories = histories.filter((h) =>
-    appliedSearch
+  /* ── 시작일시 변경 시 자동 종료일시 설정 ── */
+  const handleStartDateChange = (value: string) => {
+    setStartDateTime(value);
+    if (value && endDateTime) {
+      validateDateRange(value, endDateTime);
+    } else if (value && !endDateTime) {
+      const startMs = new Date(value).getTime();
+      const maxEnd = new Date(startMs + 7 * 24 * 60 * 60 * 1000);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const formatted = `${maxEnd.getFullYear()}-${pad(maxEnd.getMonth() + 1)}-${pad(maxEnd.getDate())}T${pad(maxEnd.getHours())}:${pad(maxEnd.getMinutes())}`;
+      setEndDateTime(formatted);
+      setDateRangeError('');
+    }
+  };
+
+  const handleEndDateChange = (value: string) => {
+    setEndDateTime(value);
+    if (startDateTime) {
+      validateDateRange(startDateTime, value);
+    }
+  };
+
+  /* ── 검색 ── */
+  const handleSearch = () => {
+    if (!validateDateRange(startDateTime, endDateTime)) return;
+    setAppliedSearch(search);
+    setAppliedStart(startDateTime);
+    setAppliedEnd(endDateTime);
+    setAppliedChangeType(changeType);
+  };
+
+  const handleReset = () => {
+    setChangeType('전체');
+    setSearch('');
+    setAppliedSearch('');
+    setStartDateTime('');
+    setEndDateTime('');
+    setAppliedStart('');
+    setAppliedEnd('');
+    setAppliedChangeType('전체');
+    setDateRangeError('');
+  };
+
+  const filteredHistories = histories.filter((h) => {
+    // 변경구분 필터
+    const changeTypeMatch =
+      appliedChangeType === '전체' || h.changeType === appliedChangeType;
+
+    // 텍스트 검색 필터
+    const textMatch = appliedSearch
       ? h.changeType.includes(appliedSearch) ||
         h.tableName.includes(appliedSearch) ||
         h.changeContent.includes(appliedSearch) ||
         h.userName.includes(appliedSearch) ||
         h.userId.toLowerCase().includes(appliedSearch.toLowerCase())
-      : true
-  );
+      : true;
+
+    // 날짜 범위 필터
+    let dateMatch = true;
+    if (appliedStart || appliedEnd) {
+      const changeMs = new Date(h.changeDate.replace(' ', 'T')).getTime();
+      if (appliedStart) {
+        dateMatch = dateMatch && changeMs >= new Date(appliedStart).getTime();
+      }
+      if (appliedEnd) {
+        dateMatch = dateMatch && changeMs <= new Date(appliedEnd).getTime();
+      }
+    }
+
+    return changeTypeMatch && textMatch && dateMatch;
+  });
 
   /* ── Render ── */
   return (
@@ -149,30 +244,93 @@ export function ChangeHistoryInquiry() {
 
       {/* ── 검색 카드 ── */}
       <div className="bg-white rounded-[6px] border border-slate-200 p-4">
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="flex-1">
-            <InputField
-              inputSize="md"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="변경구분, 테이블명, 수정내용, 수정자로 검색"
-              leftIcon={<Search size={14} />}
-            />
+        <div className="flex flex-col gap-2.5">
+          {/* Row 1: 변경구분 셀렉트 + 텍스트 검색 */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="w-full sm:w-48 shrink-0">
+              <DropdownSelect
+                inputSize="md"
+                label="변경구분"
+                labelPosition="left"
+                labelWidth="w-16"
+                value={changeType}
+                onChange={(e) => setChangeType(e.target.value)}
+                options={[
+                  { value: '전체', label: '전체' },
+                  { value: '등록', label: '등록' },
+                  { value: '수정', label: '수정' },
+                  { value: '삭제', label: '삭제' },
+                ]}
+              />
+            </div>
+            <div className="flex-1">
+              <InputField
+                inputSize="md"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="테이블명, 수정내용, 수정자로 검색"
+                leftIcon={<Search size={14} />}
+              />
+            </div>
           </div>
-          <div className="flex gap-2 shrink-0">
-            <Button variant="outline" size="md" onClick={handleReset}>
-              초기화
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              leftIcon={<Search size={14} />}
-              onClick={handleSearch}
-            >
-              조회
-            </Button>
+
+          {/* Row 2: 날짜 범위 + 버튼 */}
+          <div className="flex flex-wrap items-start gap-2">
+            {/* 날짜 범위 */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className="flex-1 min-w-[200px]">
+                <InputField
+                  inputSize="md"
+                  type="datetime-local"
+                  label="시작일시"
+                  labelPosition="left"
+                  labelWidth="w-16"
+                  value={startDateTime}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  errorText={dateRangeError && startDateTime ? ' ' : undefined}
+                />
+              </div>
+              <span className="text-slate-400 shrink-0">~</span>
+              <div className="flex-1 min-w-[200px]">
+                <InputField
+                  inputSize="md"
+                  type="datetime-local"
+                  label="종료일시"
+                  labelPosition="left"
+                  labelWidth="w-16"
+                  value={endDateTime}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  errorText={dateRangeError || undefined}
+                />
+              </div>
+            </div>
+
+            {/* 버튼 */}
+            <div className="flex gap-2 shrink-0 mt-0.5">
+              <Button variant="outline" size="md" onClick={handleReset}>
+                초기화
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                leftIcon={<Search size={15} />}
+                onClick={handleSearch}
+              >
+                조회
+              </Button>
+            </div>
           </div>
+
+          {/* 날짜 범위 안내 */}
+          {dateRangeError && (
+            <p className="text-xs text-red-500 -mt-1">{dateRangeError}</p>
+          )}
+          {!dateRangeError && (
+            <p className="text-xs text-slate-400 -mt-1">
+              조회 기간은 최대 1주일(7일)까지 설정할 수 있습니다.
+            </p>
+          )}
         </div>
       </div>
 

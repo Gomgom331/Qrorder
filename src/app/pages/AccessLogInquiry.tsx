@@ -341,21 +341,27 @@ export function AccessLogInquiry() {
           {/* Row 2: 날짜 범위 + 버튼 */}
           <div className="flex flex-wrap items-start gap-2">
             {/* 날짜 범위 */}
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              <div className="flex-1 min-w-[160px]">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className="flex-1 min-w-[200px]">
                 <InputField
                   inputSize="md"
                   type="datetime-local"
+                  label="시작일시"
+                  labelPosition="left"
+                  labelWidth="w-16"
                   value={startDateTime}
                   onChange={(e) => handleStartDateChange(e.target.value)}
                   errorText={dateRangeError && startDateTime ? ' ' : undefined}
                 />
               </div>
-              <span className="text-slate-400 text-sm shrink-0 mt-0.5">~</span>
-              <div className="flex-1 min-w-[160px]">
+              <span className="text-slate-400 shrink-0">~</span>
+              <div className="flex-1 min-w-[200px]">
                 <InputField
                   inputSize="md"
                   type="datetime-local"
+                  label="종료일시"
+                  labelPosition="left"
+                  labelWidth="w-16"
                   value={endDateTime}
                   onChange={(e) => handleEndDateChange(e.target.value)}
                   errorText={dateRangeError || undefined}
