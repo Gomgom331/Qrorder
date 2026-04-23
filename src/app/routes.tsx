@@ -91,9 +91,7 @@ export const router = createBrowserRouter([
       { path: 'system/stats', Component: Dashboard },
       { path: 'system/notices', Component: AdminNoticeManagement },
       // 게시판 관리
-      { path: 'board/notices', Component: BoardNoticeManagement },
       { path: 'board/notice-management', Component: BoardNoticeManagement },
-      { path: 'board/inquiries', Component: BoardInquiryManagement },
       { path: 'board/inquiry-management', Component: BoardInquiryManagement },
       // UI Guide
       { path: 'ui/modals', Component: ModalDemo },

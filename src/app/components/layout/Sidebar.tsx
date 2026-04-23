@@ -117,9 +117,7 @@ const navItems: NavItem[] = [
   {
     type: 'group', label: '게시판 관리', icon: LayoutList,
     children: [
-      { type: 'leaf', label: '공지사항',      path: '/board/notices' },
       { type: 'leaf', label: '공지사항 관리', path: '/board/notice-management' },
-      { type: 'leaf', label: '문의사항',      path: '/board/inquiries' },
       { type: 'leaf', label: '문의사항 관리', path: '/board/inquiry-management' },
     ],
   },
