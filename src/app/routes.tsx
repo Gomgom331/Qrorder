@@ -19,6 +19,8 @@ import { AccessLogInquiry } from './pages/AccessLogInquiry';
 import { ChangeHistoryInquiry } from './pages/ChangeHistoryInquiry';
 import { AdminManagement } from './pages/AdminManagement';
 import { AdminNoticeManagement } from './pages/AdminNoticeManagement';
+import { BoardNoticeManagement } from './pages/BoardNoticeManagement';
+import { BoardInquiryManagement } from './pages/BoardInquiryManagement';
 import { ModalDemo } from './pages/ModalDemo';
 import { TagGuide } from './pages/TagGuide';
 import { InputGuide } from './pages/InputGuide';
@@ -31,6 +33,7 @@ import { TableGuide } from './pages/TableGuide';
 import { TokenGuide } from './pages/TokenGuide';
 import { LogoExport } from './pages/LogoExport';
 import { ColorGuide } from './pages/ColorGuide';
+import { FileUploadGuide } from './pages/FileUploadGuide';
 import { Login } from './pages/Login';
 import { ClientLogin } from './pages/ClientLogin';
 import { NotFound } from './pages/NotFound';
@@ -87,6 +90,11 @@ export const router = createBrowserRouter([
       { path: 'system/users', Component: AdminManagement },
       { path: 'system/stats', Component: Dashboard },
       { path: 'system/notices', Component: AdminNoticeManagement },
+      // 게시판 관리
+      { path: 'board/notices', Component: BoardNoticeManagement },
+      { path: 'board/notice-management', Component: BoardNoticeManagement },
+      { path: 'board/inquiries', Component: BoardInquiryManagement },
+      { path: 'board/inquiry-management', Component: BoardInquiryManagement },
       // UI Guide
       { path: 'ui/modals', Component: ModalDemo },
       { path: 'ui/tags', Component: TagGuide },
@@ -100,6 +108,7 @@ export const router = createBrowserRouter([
       { path: 'ui/token', Component: TokenGuide },
       { path: 'ui/logo', Component: LogoExport },
       { path: 'ui/colors', Component: ColorGuide },
+      { path: 'ui/file-upload', Component: FileUploadGuide },
       { path: '*', Component: NotFound },
     ],
   },

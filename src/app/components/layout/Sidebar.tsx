@@ -19,6 +19,8 @@ import {
   Palette,
   Braces,
   Megaphone,
+  LayoutList,
+  Paperclip,
 } from 'lucide-react';
 import { ScrollBox } from '../ui/ScrollBox';
 
@@ -112,6 +114,15 @@ const navItems: NavItem[] = [
       { type: 'leaf', label: '통계',         path: '/system/stats' },
     ],
   },
+  {
+    type: 'group', label: '게시판 관리', icon: LayoutList,
+    children: [
+      { type: 'leaf', label: '공지사항',      path: '/board/notices' },
+      { type: 'leaf', label: '공지사항 관리', path: '/board/notice-management' },
+      { type: 'leaf', label: '문의사항',      path: '/board/inquiries' },
+      { type: 'leaf', label: '문의사항 관리', path: '/board/inquiry-management' },
+    ],
+  },
   { type: 'link', label: '공지 · 문의 관리', path: '/system/notices', icon: Megaphone },
   // UI 가이드: 아이콘 유지
   {
@@ -124,6 +135,7 @@ const navItems: NavItem[] = [
       { type: 'leaf', label: '버튼',                     path: '/ui/buttons',        icon: ToggleLeft },
       { type: 'leaf', label: '체크박스 · 라디오 · 토글', path: '/ui/checkbox-radio', icon: CheckSquare },
       { type: 'leaf', label: '폼 알림',                  path: '/ui/form-alerts',    icon: AlertTriangle },
+      { type: 'leaf', label: '첨부파일 업로드',           path: '/ui/file-upload',    icon: Paperclip },
       { type: 'leaf', label: '페이지네이션',             path: '/ui/pagination',     icon: List },
       { type: 'leaf', label: '트리 구조',                path: '/ui/tree',           icon: GitBranch },
       { type: 'leaf', label: '테이블 패턴',              path: '/ui/table',          icon: List },

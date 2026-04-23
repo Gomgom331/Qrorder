@@ -3,7 +3,7 @@ import { CheckboxField } from '../components/ui/CheckboxField';
 import { InputField } from '../components/ui/InputField';
 import { DropdownSelect } from '../components/ui/DropdownSelect';
 import { Button } from '../components/ui/Button';
-import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, Paperclip } from 'lucide-react';
 import React from 'react';
 
 // ─── Section wrapper ─────────────────────────────────────────────
@@ -749,6 +749,100 @@ export function TableGuide() {
           </div>
         </div>
       </Section>
+
+      {/* 8. 첨부파일 표기 패턴 */}
+      <Section title="8. 첨부파일 표기 패턴" desc="테이블 제목 셀에서 첨부파일 유무·개수를 Paperclip 아이콘으로 표기합니다. 파일이 없으면 아무것도 렌더링하지 않습니다.">
+
+        {/* 3종 패턴 카드 */}
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          {/* 파일 없음 */}
+          <div className="border border-slate-200 rounded-[6px] overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 text-[11px] font-medium text-slate-400 uppercase tracking-wide">파일 없음</div>
+            <div className="px-3 py-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-slate-800 truncate">시스템 점검 안내</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">아이콘 없이 제목만 표시</p>
+            </div>
+          </div>
+          {/* 파일 1개 */}
+          <div className="border border-slate-200 rounded-[6px] overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 text-[11px] font-medium text-slate-400 uppercase tracking-wide">파일 1개</div>
+            <div className="px-3 py-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-slate-800 truncate">결제 정책 변경</span>
+                <span className="flex items-center gap-0.5 shrink-0 text-slate-400">
+                  <Paperclip size={11} />
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Paperclip 아이콘만 · 숫자 생략</p>
+            </div>
+          </div>
+          {/* 파일 2개 이상 */}
+          <div className="border border-slate-200 rounded-[6px] overflow-hidden">
+            <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 text-[11px] font-medium text-slate-400 uppercase tracking-wide">파일 2개+</div>
+            <div className="px-3 py-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-slate-800 truncate">이용약관 개정 안내</span>
+                <span className="flex items-center gap-0.5 shrink-0 text-slate-400">
+                  <Paperclip size={11} />
+                  <span className="text-[10px]">3</span>
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Paperclip + 개수 숫자 함께 표시</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 실제 테이블 미리보기 */}
+        <p className="text-xs font-medium text-slate-600 mb-2">실제 테이블 적용 예시</p>
+        <div className="overflow-x-auto border border-slate-200 rounded-[6px]">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 w-[40%]">제목</th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500">내용</th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 w-[90px]">등록자</th>
+                <th className="text-center px-3 py-2.5 text-xs font-medium text-slate-500 w-[72px]">사용여부</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {[
+                { title: '시스템 정기 점검 안내 (4/25)', content: '새벽 2시~4시 정기 점검이 진행됩니다.', author: '시스템관리자', active: true,  files: 0 },
+                { title: '결제 수수료 정책 변경 안내',   content: '5월부터 결제 수수료 정책이 변경됩니다.',  author: '운영팀',       active: false, files: 1 },
+                { title: '이용약관 개정 안내 (5/1 적용)', content: '5월 1일부터 개정 약관이 적용됩니다.',     author: '운영팀',       active: true,  files: 3 },
+                { title: '서비스 이용 가이드 업데이트',  content: '가이드 문서가 최신 버전으로 업데이트됐습니다.', author: '운영팀', active: true,  files: 2 },
+              ].map((row) => (
+                <tr key={row.title} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-3 py-2.5 text-slate-800 font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <span className="line-clamp-1">{row.title}</span>
+                      {row.files > 0 && (
+                        <span className="flex items-center gap-0.5 shrink-0 text-slate-400">
+                          <Paperclip size={11} />
+                          {row.files > 1 && <span className="text-[10px]">{row.files}</span>}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-slate-500"><span className="line-clamp-1">{row.content}</span></td>
+                  <td className="px-3 py-2.5 text-slate-500">{row.author}</td>
+                  <td className="px-3 py-2.5 text-center">
+                    <span className={`text-xs px-2 py-0.5 rounded-[3px] ${row.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                      {row.active ? 'Y' : 'N'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-xs text-slate-400 mt-3">
+          • 파일 0개: 아이콘 없음 &nbsp;•&nbsp; 파일 1개: <Paperclip size={11} className="inline mb-px" /> 아이콘만 &nbsp;•&nbsp; 파일 2개+: <Paperclip size={11} className="inline mb-px" /> + 개수 숫자 &nbsp;•&nbsp; 아이콘 색상: text-slate-400 size={"{11}"}
+        </p>
+      </Section>
+
     </div>
   );
 }
