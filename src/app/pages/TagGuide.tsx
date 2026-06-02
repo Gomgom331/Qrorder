@@ -207,6 +207,93 @@ export function TagGuide() {
           <Tag color="blue" variant="soft" size="sm">김영희 (manager001)</Tag>
         </Row>
       </Section>
+
+      {/* 8. Table Badge Style */}
+      <Section title="테이블 게시판 스타일" desc="inline-block, padding: 0.1875rem 0.5rem, border-radius: var(--radius-sm), font-size: var(--typography-size-caption), whitespace: nowrap">
+        <Row label="상태 표시 (dot)">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-emerald-50 text-emerald-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            답변완료
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-orange-50 text-orange-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+            미답변
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-50 text-blue-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+            진행중
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+            취소
+          </span>
+        </Row>
+        <Row label="단색 스타일 (soft)">
+          <span className="inline-block text-xs font-medium bg-slate-100 text-slate-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            대기
+          </span>
+          <span className="inline-block text-xs font-medium bg-[#FF6B2B]/10 text-[#FF6B2B] px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            주요
+          </span>
+          <span className="inline-block text-xs font-medium bg-emerald-50 text-emerald-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            정상
+          </span>
+          <span className="inline-block text-xs font-medium bg-purple-50 text-purple-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            특별
+          </span>
+        </Row>
+        <Row label="outline 스타일">
+          <span className="inline-block text-xs font-medium border border-slate-200 text-slate-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            일반
+          </span>
+          <span className="inline-block text-xs font-medium border border-[#FF6B2B] text-[#FF6B2B] px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            중요
+          </span>
+          <span className="inline-block text-xs font-medium border border-emerald-500 text-emerald-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            승인
+          </span>
+        </Row>
+        <Row label="filled 스타일">
+          <span className="inline-block text-xs font-medium bg-slate-600 text-white px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            기본
+          </span>
+          <span className="inline-block text-xs font-medium bg-[#FF6B2B] text-white px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            브랜드
+          </span>
+          <span className="inline-block text-xs font-medium bg-emerald-500 text-white px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            완료
+          </span>
+          <span className="inline-block text-xs font-medium bg-red-500 text-white px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">
+            거절
+          </span>
+        </Row>
+        <Row label="테이블 사용 예시">
+          <div className="w-full border border-slate-200 rounded-[4px] overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">제목</th>
+                  <th className="text-center px-3 py-2 text-xs font-medium text-slate-500 w-24">상태</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <tr>
+                  <td className="px-3 py-2 text-slate-700">메뉴 이미지 업로드 오류</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className="inline-block text-xs font-medium bg-orange-50 text-orange-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">미답변</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 text-slate-700">결제 취소 처리 방법 문의</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className="inline-block text-xs font-medium bg-emerald-50 text-emerald-600 px-2 py-[0.1875rem] rounded-[4px] whitespace-nowrap">답변완료</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Row>
+      </Section>
     </div>
   );
 }

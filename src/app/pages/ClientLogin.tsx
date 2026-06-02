@@ -42,7 +42,7 @@ export function ClientLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#FFF4EF] flex items-center justify-center px-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-20 -right-20 w-[400px] h-[400px] rounded-full bg-[#FF6B2B]/5" />
@@ -98,7 +98,7 @@ export function ClientLogin() {
               <div className="flex items-center justify-between text-xs">
                 <CheckboxField
                   size="sm"
-                  label="로그인 유지"
+                  label="아이디 저장"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
@@ -119,6 +119,15 @@ export function ClientLogin() {
                 className="w-full"
               >
                 로그인
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="w-full mt-[0.375rem]"
+              >
+                회원가입
               </Button>
             </form>
 

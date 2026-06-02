@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import {
   Search, Plus, Pencil, Paperclip, X,
   FileText, File, Image, FileCode, FileSpreadsheet,
-  AlertTriangle,
+  AlertTriangle, Info,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { InputField } from '../components/ui/InputField';
@@ -13,21 +13,24 @@ import { Pagination } from '../components/ui/Pagination';
 
 // ─── 첨부파일 상수 ───────────────────────────────────────────────
 
-const MAX_FILES   = 10;
-const MAX_SIZE_MB = 10;
+const MAX_FILES      = 5;
+const MAX_SIZE_MB    = 10;
+const MAX_TOTAL_MB   = 50;
 
 // ─── 확장자별 아이콘 ─────────────────────────────────────────────
 
 function FileIcon({ name }: { name: string }) {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext))
+  if (['jpg', 'jpeg', 'png'].includes(ext))
     return <Image size={13} className="shrink-0 text-blue-400" />;
-  if (['xls', 'xlsx', 'csv'].includes(ext))
+  if (['xlsx'].includes(ext))
     return <FileSpreadsheet size={13} className="shrink-0 text-emerald-500" />;
-  if (['js', 'ts', 'tsx', 'jsx', 'html', 'css', 'json'].includes(ext))
-    return <FileCode size={13} className="shrink-0 text-purple-400" />;
   if (['pdf'].includes(ext))
     return <FileText size={13} className="shrink-0 text-red-400" />;
+  if (['docx', 'pptx'].includes(ext))
+    return <FileText size={13} className="shrink-0 text-blue-500" />;
+  if (['zip'].includes(ext))
+    return <File size={13} className="shrink-0 text-amber-500" />;
   return <File size={13} className="shrink-0 text-slate-400" />;
 }
 
@@ -278,7 +281,7 @@ export function BoardNoticeManagement() {
     if (!incoming.length) return;
     setFileError(null);
 
-    // 용량 검사
+    // 개별 파일 용량 검사
     const oversized = incoming.find((f) => f.size > MAX_SIZE_MB * 1024 * 1024);
     if (oversized) {
       setFileError(`${oversized.name}: 파일 크기가 ${MAX_SIZE_MB}MB를 초과합니다.`);
@@ -296,6 +299,18 @@ export function BoardNoticeManagement() {
 
     const remaining = MAX_FILES - current;
     const toAdd = incoming.slice(0, remaining);
+
+    // 전체 용량 검사
+    const currentTotalBytes = newFiles.reduce((sum, f) => sum + f.size, 0);
+    const incomingTotalBytes = toAdd.reduce((sum, f) => sum + f.size, 0);
+    const newTotalMB = (currentTotalBytes + incomingTotalBytes) / (1024 * 1024);
+
+    if (newTotalMB > MAX_TOTAL_MB) {
+      setFileError(`전체 파일 용량이 ${MAX_TOTAL_MB}MB를 초과할 수 없습니다.`);
+      e.target.value = '';
+      return;
+    }
+
     if (incoming.length > remaining) {
       setFileError(`최대 ${MAX_FILES}개 제한으로 ${remaining}개만 추가되었습니다.`);
     }
@@ -317,6 +332,9 @@ export function BoardNoticeManagement() {
   const totalFiles   = form.attachmentNames.length + newFiles.length;
   const hasFiles     = totalFiles > 0;
   const isMaxReached = totalFiles >= MAX_FILES;
+
+  // 현재 신규 파일들의 총 용량 (KB)
+  const totalSizeKB = newFiles.reduce((sum, f) => sum + f.size, 0) / 1024;
 
   // ── Render ──
   return (
@@ -444,8 +462,8 @@ export function BoardNoticeManagement() {
         title={editingNotice ? '공지사항 수정' : '공지사항 등록'}
         footer={
           <>
+            <ModalBtn variant="primary" onClick={handleSave}>확인</ModalBtn>
             <ModalBtn variant="outline" onClick={() => setModalOpen(false)}>닫기</ModalBtn>
-            <ModalBtn variant="primary" onClick={handleSave}>{editingNotice ? '수정' : '확인'}</ModalBtn>
           </>
         }
       >
@@ -502,14 +520,7 @@ export function BoardNoticeManagement() {
 
           {/* 첨부파일 */}
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-slate-500">첨부파일</label>
-              {hasFiles && (
-                <span className={`text-[11px] tabular-nums font-medium px-1.5 py-0.5 rounded-[3px] ${isMaxReached ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
-                  {totalFiles}
-                </span>
-              )}
-            </div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">첨부파일</label>
 
             {/* 인풋 그룹 */}
             <div className="flex h-9">
@@ -521,7 +532,7 @@ export function BoardNoticeManagement() {
                   : 'bg-white border-slate-200'
               }`}>
                 <Paperclip size={14} className={`shrink-0 ${isMaxReached ? 'text-slate-300' : fileError ? 'text-red-400' : 'text-slate-400'}`} />
-                <span className="flex-1 text-sm text-slate-300 truncate">파일을 선택하거나 드래그하세요</span>
+                <span className="flex-1 text-sm text-slate-300 truncate">파일을 선택해주세요</span>
               </div>
               <button
                 type="button"
@@ -544,22 +555,17 @@ export function BoardNoticeManagement() {
                 <AlertTriangle size={12} className="text-red-400 shrink-0 mt-px" />
                 <p className="text-xs text-red-600">{fileError}</p>
               </div>
-            ) : isMaxReached ? (
-              <div className="mt-1.5 flex items-start gap-1.5 px-2.5 py-1.5 bg-amber-50 border border-amber-100 rounded-[4px]">
-                <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-px" />
-                <p className="text-xs text-amber-700">최대 {MAX_FILES}개 파일이 등록되었습니다. 추가하려면 기존 파일을 제거하세요.</p>
-              </div>
             ) : (
-              <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-[3px]">
-                  <span>📏</span> {MAX_SIZE_MB}MB 이하
-                </span>
-                <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-[3px]">
-                  <span>📁</span> 최대 {MAX_FILES}개
-                </span>
-                <span className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-[3px]">
-                  PDF · DOCX · XLSX · PNG · JPG
-                </span>
+              <div className="flex items-center justify-between mt-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Info size={11} className="text-slate-400 shrink-0" />
+                  <p className="text-[11px] text-slate-500">
+                    파일당 최대 {MAX_SIZE_MB}MB · 전체 최대 {MAX_TOTAL_MB}MB · 최대 {MAX_FILES}개 · JPG · PNG · PDF · DOCX · XLSX · PPTX · ZIP
+                  </p>
+                </div>
+                <p className="text-[11px] text-slate-400 tabular-nums shrink-0 ml-2">
+                  {totalFiles}/{MAX_FILES}개 · {totalSizeKB.toFixed(0)} KB/{MAX_TOTAL_MB}MB
+                </p>
               </div>
             )}
 
@@ -567,20 +573,20 @@ export function BoardNoticeManagement() {
             {hasFiles && (
               <div className="mt-2 border border-slate-200 rounded-[4px] overflow-hidden">
                 <div
-                  className={totalFiles > 5 ? 'overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-slate-50 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full' : ''}
-                  style={totalFiles > 5 ? { maxHeight: '185px' } : undefined}
+                  className={totalFiles > 3 ? 'overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full' : ''}
+                  style={totalFiles > 3 ? { maxHeight: '111px' } : undefined}
                 >
                   {form.attachmentNames.map((name) => (
                     <div
                       key={name}
-                      className="flex items-center gap-2.5 px-3 py-2 border-b border-slate-100 last:border-b-0 hover:bg-slate-50 group transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 border-b border-slate-100 last:border-b-0 hover:bg-slate-50 transition-colors"
                     >
                       <FileIcon name={name} />
                       <span className="flex-1 text-sm text-slate-700 truncate">{name}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveExisting(name)}
-                        className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                        className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
                       >
                         <X size={12} />
                       </button>
@@ -589,15 +595,16 @@ export function BoardNoticeManagement() {
                   {newFiles.map((file, i) => (
                     <div
                       key={`new-${i}`}
-                      className="flex items-center gap-2.5 px-3 py-2 border-b border-slate-100 last:border-b-0 bg-[#FF6B2B]/[0.03] hover:bg-[#FF6B2B]/[0.06] group transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 border-b border-slate-100 last:border-b-0 bg-[#FF6B2B]/[0.03] hover:bg-[#FF6B2B]/[0.06] transition-colors"
                     >
                       <FileIcon name={file.name} />
                       <span className="flex-1 text-sm text-slate-700 truncate">{file.name}</span>
+                      <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 bg-[#FF6B2B] text-white rounded-[3px]">NEW</span>
                       <span className="shrink-0 text-xs text-slate-400">{formatFileSize(file.size)}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveNew(i)}
-                        className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                        className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
                       >
                         <X size={12} />
                       </button>

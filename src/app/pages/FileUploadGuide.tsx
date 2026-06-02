@@ -284,7 +284,7 @@ function FileInputGroup({
         <div className="mt-2 border border-slate-200 rounded-[4px] overflow-hidden">
           {scrollable && totalFiles > maxVisible ? (
             <div
-              className="overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-slate-50 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full"
+              className="overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full"
               style={{ maxHeight: `${scrollMaxH}px` }}
             >
               {rows}
@@ -353,7 +353,7 @@ function FileDownloadList({
       <div className="border border-slate-200 rounded-[4px] overflow-hidden">
         {scrollable && files.length > maxVisible ? (
           <div
-            className="overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-slate-50 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full"
+            className="overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full"
             style={{ maxHeight: `${scrollMaxH}px` }}
           >
             {rows}
@@ -776,7 +776,7 @@ export function FileUploadGuide() {
             </div>
             <div className="border border-slate-200 rounded-[4px] overflow-hidden">
               <div
-                className="overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-slate-50 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full"
+                className="overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full"
                 style={{ maxHeight: `${SIZE_CONFIG.md.rowH * 3}px` }}
               >
                 {['이용약관_개정안_v2.pdf', '서비스_가이드.docx'].map((name) => (
@@ -814,7 +814,7 @@ export function FileUploadGuide() {
             <div>
               <div className="border border-slate-200 rounded-[4px] overflow-hidden">
                 <div
-                  className="overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-slate-50 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full"
+                  className="overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full"
                   style={{ maxHeight: `${SIZE_CONFIG.md.rowH * 3}px` }}
                 >
                   {[

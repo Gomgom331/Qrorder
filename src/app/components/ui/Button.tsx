@@ -3,7 +3,8 @@ import { Loader2, ExternalLink } from 'lucide-react';
 
 export type ButtonVariant =
   | 'primary' | 'secondary' | 'outline' | 'ghost'
-  | 'danger' | 'text' | 'icon' | 'icon-text' | 'toggle' | 'link';
+  | 'danger' | 'text' | 'icon' | 'icon-text' | 'toggle' | 'link'
+  | 'primary-light' | 'primary-outline' | 'secondary-primary';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 // ─── Size config ─────────────────────────────────────────────────
@@ -25,6 +26,9 @@ const variantBase: Record<ButtonVariant, string> = {
   icon:      'text-slate-500 bg-transparent hover:bg-slate-100 active:bg-slate-200 focus-visible:ring-2 focus-visible:ring-slate-400/30 focus-visible:outline-none',
   'icon-text': 'bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300 focus-visible:ring-2 focus-visible:ring-slate-400/30 focus-visible:outline-none',
   toggle:    'border border-slate-300 text-slate-600 bg-transparent hover:bg-slate-50 active:bg-slate-100 focus-visible:ring-2 focus-visible:ring-[#FF6B2B]/30 focus-visible:outline-none',
+  'primary-light': 'bg-[#FF6B2B]/10 text-[#FF6B2B] hover:bg-[#FF6B2B]/20 active:bg-[#FF6B2B]/30 focus-visible:ring-2 focus-visible:ring-[#FF6B2B]/40 focus-visible:outline-none',
+  'primary-outline': 'border border-[#FF6B2B] text-[#FF6B2B] bg-transparent hover:bg-[#FF6B2B]/5 active:bg-[#FF6B2B]/10 focus-visible:ring-2 focus-visible:ring-[#FF6B2B]/40 focus-visible:outline-none',
+  'secondary-primary': 'bg-slate-100 text-[#FF6B2B] hover:bg-slate-200 active:bg-slate-300 focus-visible:ring-2 focus-visible:ring-slate-400/30 focus-visible:outline-none',
 };
 
 const disabledCls = 'opacity-40 cursor-not-allowed pointer-events-none';

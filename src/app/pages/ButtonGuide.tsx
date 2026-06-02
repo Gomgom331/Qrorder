@@ -178,7 +178,7 @@ export function ButtonGuide() {
     <div className="p-5 lg:p-6 space-y-4">
       <div>
         <h2 className="text-slate-800">버튼 컴포넌트</h2>
-        <p className="text-sm text-slate-400 mt-1">3가지 사이즈 × 10가지 타입 × 7가지 상태의 버튼 컴포넌트 가이드</p>
+        <p className="text-sm text-slate-400 mt-1">3가지 사이즈 × 13가지 타입 × 7가지 상태의 버튼 컴포넌트 가이드</p>
       </div>
 
       {/* Size reference */}
@@ -251,15 +251,38 @@ export function ButtonGuide() {
           <Button variant="toggle" size="md" leftIcon={<Sun size={15} />} selected={!toggleMap['theme']} onClick={() => toggle('theme')}>라이트</Button>
           <Button variant="toggle" size="md" leftIcon={<Moon size={15} />} selected={toggleMap['theme']} onClick={() => toggle('theme')}>다크</Button>
         </Row>
+        <Row label="primary-light">
+          <Button variant="primary-light" size="md">강조 버튼</Button>
+          <Button variant="primary-light" size="md" leftIcon={<Plus size={15} />}>새 항목</Button>
+          <Button variant="primary-light" size="md" rightIcon={<ChevronRight size={15} />}>자세히</Button>
+        </Row>
+        <Row label="primary-outline">
+          <Button variant="primary-outline" size="md">선택</Button>
+          <Button variant="primary-outline" size="md" leftIcon={<QrCode size={15} />}>QR 생성</Button>
+          <Button variant="primary-outline" size="md" rightIcon={<ExternalLink size={15} />}>외부 링크</Button>
+        </Row>
+        <Row label="secondary-primary">
+          <Button variant="secondary-primary" size="md">중요 취소</Button>
+          <Button variant="secondary-primary" size="md" leftIcon={<Download size={15} />}>다운로드</Button>
+          <Button variant="secondary-primary" size="md" rightIcon={<ChevronRight size={15} />}>다음</Button>
+        </Row>
       </Section>
 
       {/* ── 2. Sizes × Types ── */}
       <Section title="사이즈 비교 (SM · MD · LG)" desc="주요 타입의 3가지 사이즈 비교">
-        {(['primary', 'secondary', 'outline', 'danger'] as ButtonVariant[]).map((variant) => (
+        {(['primary', 'secondary', 'outline', 'danger', 'primary-light', 'primary-outline', 'secondary-primary'] as ButtonVariant[]).map((variant) => (
           <Row key={variant} label={variant}>
             {(['sm', 'md', 'lg'] as ButtonSize[]).map((size) => (
               <div key={size} className="flex flex-col items-center gap-1">
-                <Button variant={variant} size={size}>{variant === 'primary' ? '저장' : variant === 'secondary' ? '취소' : variant === 'outline' ? '조회' : '삭제'}</Button>
+                <Button variant={variant} size={size}>
+                  {variant === 'primary' ? '저장' :
+                   variant === 'secondary' ? '취소' :
+                   variant === 'outline' ? '조회' :
+                   variant === 'danger' ? '삭제' :
+                   variant === 'primary-light' ? '강조' :
+                   variant === 'primary-outline' ? '선택' :
+                   '중요'}
+                </Button>
                 <span className="text-[10px] text-slate-400 font-mono">{size}</span>
               </div>
             ))}
