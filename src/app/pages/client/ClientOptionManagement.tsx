@@ -1,523 +1,445 @@
-import { CheckboxField } from '../../components/ui/CheckboxField';
-import { RadioField } from '../../components/ui/RadioField';
-import { useState, useMemo } from 'react';
-import { Plus, Pencil, Trash2, Search, X, AlertCircle } from 'lucide-react';
-import { Button } from '../../components/ui/Button';
-import { InputField } from '../../components/ui/InputField';
+import { useState } from 'react';
+import { MousePointerClick, Search, RotateCcw } from 'lucide-react';
 import { Modal, ModalBtn } from '../../components/ui/Modal';
-import { Tag } from '../../components/ui/Tag';
-import { Toggle } from '../../components/ui/Toggle';
+import { InputField } from '../../components/ui/InputField';
+import { Button } from '../../components/ui/Button';
+import { CheckboxField } from '../../components/ui/CheckboxField';
+import { InlineEditTable, useInlineTable, InlineRow } from '../../components/ui/InlineEditTable';
 
 // ─── Types ───────────────────────────────────────────────────────
-interface OptionItem {
+
+interface MenuRow { id: string; name: string; usable: boolean; }
+
+interface OptionGroupRow extends InlineRow {
   id: string;
   name: string;
-  price: number;
+  required: string;
+  usable: string;
+  isNew?: boolean;
 }
 
-interface OptionGroup {
+interface OptionItemRow extends InlineRow {
   id: string;
   name: string;
-  type: 'single' | 'multiple';
-  required: boolean;
-  status: 'active' | 'inactive';
-  items: OptionItem[];
+  price: string;
+  defaultUse: string;
+  usable: string;
+  isNew?: boolean;
 }
 
-// ─── Mock data ───────────────────────────────────────────────────
-const MOCK_DATA: OptionGroup[] = [
-  {
-    id: '1',
-    name: '맵기 조절',
-    type: 'single',
-    required: false,
-    status: 'active',
-    items: [
-      { id: '1-1', name: '순한맛', price: 0 },
-      { id: '1-2', name: '보통맛', price: 0 },
-      { id: '1-3', name: '매운맛', price: 0 },
-      { id: '1-4', name: '아주 매운맛', price: 500 },
-    ],
-  },
-  {
-    id: '2',
-    name: '밥 양',
-    type: 'single',
-    required: true,
-    status: 'active',
-    items: [
-      { id: '2-1', name: '소', price: -500 },
-      { id: '2-2', name: '중', price: 0 },
-      { id: '2-3', name: '대', price: 500 },
-    ],
-  },
-  {
-    id: '3',
-    name: '추가 토핑',
-    type: 'multiple',
-    required: false,
-    status: 'active',
-    items: [
-      { id: '3-1', name: '치즈 추가', price: 1000 },
-      { id: '3-2', name: '베이컨 추가', price: 1500 },
-      { id: '3-3', name: '계란 추가', price: 500 },
-      { id: '3-4', name: '야채 추가', price: 500 },
-    ],
-  },
-  {
-    id: '4',
-    name: '소스 선택',
-    type: 'single',
-    required: true,
-    status: 'active',
-    items: [
-      { id: '4-1', name: '데미글라스', price: 0 },
-      { id: '4-2', name: '타르타르', price: 0 },
-      { id: '4-3', name: '칠리', price: 0 },
-    ],
-  },
-  {
-    id: '5',
-    name: '사이즈',
-    type: 'single',
-    required: true,
-    status: 'inactive',
-    items: [
-      { id: '5-1', name: 'S', price: -1000 },
-      { id: '5-2', name: 'M', price: 0 },
-      { id: '5-3', name: 'L', price: 1000 },
-    ],
-  },
+// ─── Seed data ───────────────────────────────────────────────────
+
+const INITIAL_MENUS: MenuRow[] = [
+  { id: 'm1', name: '불고기 정식', usable: true },
+  { id: 'm2', name: '김치찌개',   usable: true },
+  { id: 'm3', name: '된장찌개',   usable: true },
+  { id: 'm4', name: '비빔밥',     usable: true },
+  { id: 'm5', name: '제육볶음',   usable: true },
+  { id: 'm6', name: '돈까스',     usable: true },
+  { id: 'm7', name: '우동',       usable: false },
 ];
 
-// ─── Main ────────────────────────────────────────────────────────
+const INITIAL_GROUPS: Record<string, OptionGroupRow[]> = {
+  m1: [
+    { id: 'og1', name: '맵기 조절', required: '선택', usable: 'Y' },
+    { id: 'og2', name: '밥 양',     required: '필수', usable: 'Y' },
+  ],
+  m2: [{ id: 'og3', name: '맵기 조절', required: '선택', usable: 'Y' }],
+  m3: [],
+  m4: [
+    { id: 'og4', name: '맵기 조절', required: '선택', usable: 'Y' },
+    { id: 'og5', name: '추가 토핑', required: '선택', usable: 'N' },
+  ],
+  m5: [
+    { id: 'og6', name: '맵기 조절', required: '필수', usable: 'Y' },
+    { id: 'og7', name: '밥 양',     required: '선택', usable: 'Y' },
+  ],
+  m6: [{ id: 'og8', name: '소스 선택', required: '필수', usable: 'Y' }],
+  m7: [],
+};
+
+const INITIAL_ITEMS: Record<string, OptionItemRow[]> = {
+  og1: [
+    { id: 'oi1', name: '순한맛',      price: '0',   defaultUse: 'Y',  usable: 'Y' },
+    { id: 'oi2', name: '보통맛',      price: '0',   defaultUse: 'N', usable: 'Y' },
+    { id: 'oi3', name: '매운맛',      price: '0',   defaultUse: 'N', usable: 'Y' },
+    { id: 'oi4', name: '아주 매운맛', price: '500', defaultUse: 'N', usable: 'Y' },
+  ],
+  og2: [
+    { id: 'oi5', name: '소', price: '-500', defaultUse: 'N', usable: 'Y' },
+    { id: 'oi6', name: '중', price: '0',    defaultUse: 'Y',  usable: 'Y' },
+    { id: 'oi7', name: '대', price: '500',  defaultUse: 'N', usable: 'Y' },
+  ],
+  og3: [
+    { id: 'oi8',  name: '순한맛', price: '0', defaultUse: 'Y',  usable: 'Y' },
+    { id: 'oi9',  name: '보통맛', price: '0', defaultUse: 'N', usable: 'Y' },
+    { id: 'oi10', name: '매운맛', price: '0', defaultUse: 'N', usable: 'Y' },
+  ],
+  og4: [
+    { id: 'oi11', name: '순한맛', price: '0', defaultUse: 'N', usable: 'Y' },
+    { id: 'oi12', name: '매운맛', price: '0', defaultUse: 'Y',  usable: 'Y' },
+  ],
+  og5: [
+    { id: 'oi13', name: '치즈 추가',   price: '1000', defaultUse: 'N', usable: 'Y' },
+    { id: 'oi14', name: '베이컨 추가', price: '1500', defaultUse: 'N', usable: 'Y' },
+  ],
+  og6: [
+    { id: 'oi15', name: '순한맛',      price: '0',   defaultUse: 'N', usable: 'Y' },
+    { id: 'oi16', name: '매운맛',      price: '0',   defaultUse: 'N', usable: 'Y' },
+    { id: 'oi17', name: '아주 매운맛', price: '500', defaultUse: 'N', usable: 'Y' },
+  ],
+  og7: [
+    { id: 'oi18', name: '소', price: '-500', defaultUse: 'N', usable: 'Y' },
+    { id: 'oi19', name: '중', price: '0',    defaultUse: 'Y',  usable: 'Y' },
+    { id: 'oi20', name: '대', price: '500',  defaultUse: 'N', usable: 'Y' },
+  ],
+  og8: [
+    { id: 'oi21', name: '데미글라스', price: '0', defaultUse: 'Y',  usable: 'Y' },
+    { id: 'oi22', name: '타르타르',   price: '0', defaultUse: 'N', usable: 'Y' },
+    { id: 'oi23', name: '칠리',       price: '0', defaultUse: 'N', usable: 'Y' },
+  ],
+};
+
+// ─── 컬럼 정의 ───────────────────────────────────────────────────
+
+const YN_OPTIONS = [{ value: 'Y', label: '사용' }, { value: 'N', label: '미사용' }];
+
+const GROUP_COLUMNS = [
+  { key: 'name'     as const, label: '옵션 그룹 명', type: 'input'  as const, placeholder: '그룹명 입력' },
+  { key: 'required' as const, label: '필수 선택',    type: 'select' as const, className: 'w-[130px]',
+    options: [{ value: '선택', label: '선택' }, { value: '필수', label: '필수' }] },
+  { key: 'usable'   as const, label: '사용 여부',    type: 'select' as const, className: 'w-[120px]', options: YN_OPTIONS },
+];
+const GROUP_DEFAULTS = { name: '', required: '선택', usable: 'Y' };
+
+const ITEM_COLUMNS = [
+  { key: 'name'       as const, label: '옵션 명',         type: 'input'    as const, placeholder: '옵션명 입력' },
+  { key: 'price'      as const, label: '옵션 가격',        type: 'input'    as const, className: 'w-[130px]', placeholder: '0' },
+  { key: 'defaultUse' as const, label: '기본선택 사용여부', type: 'select' as const, className: 'w-[150px]', options: YN_OPTIONS },
+  { key: 'usable'     as const, label: '사용 여부',        type: 'select'   as const, className: 'w-[120px]', options: YN_OPTIONS },
+];
+const ITEM_DEFAULTS = { name: '', price: '0', defaultUse: 'N', usable: 'Y' };
+
+// ─── 메뉴 모달 타입 ───────────────────────────────────────────────
+
+interface MenuModalState { open: boolean; mode: 'new' | 'edit'; targetId: string | null; name: string; usable: boolean; }
+const MENU_MODAL_INIT: MenuModalState = { open: false, mode: 'new', targetId: null, name: '', usable: true };
+
+// ─── Page ────────────────────────────────────────────────────────
+
 export function ClientOptionManagement() {
-  const [data, setData] = useState<OptionGroup[]>(MOCK_DATA);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput]         = useState('');
+  const [searchQuery, setSearchQuery]         = useState('');
+  const [menus, setMenus]                     = useState<MenuRow[]>(INITIAL_MENUS);
+  const [groups, setGroups]                   = useState<Record<string, OptionGroupRow[]>>(INITIAL_GROUPS);
+  const [items, setItems]                     = useState<Record<string, OptionItemRow[]>>(INITIAL_ITEMS);
+  const [selectedMenuId, setSelectedMenuId]   = useState<string | null>(null);
+  const [checkedMenuIds, setCheckedMenuIds]   = useState<Set<string>>(new Set());
 
-  // Modal states
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<OptionGroup | null>(null);
-  const [formData, setFormData] = useState<Partial<OptionGroup>>({});
-  const [newItems, setNewItems] = useState<OptionItem[]>([]);
+  const {
+    selectedId: selectedGroupId,
+    setSelectedId: setSelectedGroupId,
+    savedMsg: groupSaved,
+    handleSave: handleGroupSave,
+  } = useInlineTable<OptionGroupRow>([]);
 
-  // Delete states
-  const [deleteTarget, setDeleteTarget] = useState<OptionGroup | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const {
+    selectedId: selectedItemId,
+    setSelectedId: setSelectedItemId,
+    savedMsg: itemSaved,
+    handleSave: handleItemSave,
+  } = useInlineTable<OptionItemRow>([]);
 
-  // Filtered data
-  const filtered = useMemo(() =>
-    data.filter((item) => item.name.toLowerCase().includes(searchTerm.toLowerCase())),
-    [data, searchTerm]
+  const [deleteOpen, setDeleteOpen]   = useState(false);
+  const [deleteMode, setDeleteMode]   = useState<'checked' | 'single'>('checked');
+  const [menuModal, setMenuModal]     = useState<MenuModalState>(MENU_MODAL_INIT);
+  const [menuNameError, setMenuNameError] = useState<string | undefined>();
+  const [editingGroupId, setEditingGroupId]   = useState<string | null>(null);
+  const [editingItemId, setEditingItemId]     = useState<string | null>(null);
+
+  const filteredMenus = menus.filter((m) =>
+    m.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Checkbox helpers
-  const allSelected = filtered.length > 0 && filtered.every((i) => selectedIds.has(i.id));
-  const someSelected = filtered.some((i) => selectedIds.has(i.id));
+  const selectedGroups: OptionGroupRow[] = selectedMenuId ? (groups[selectedMenuId] ?? []) : [];
+  const selectedItems: OptionItemRow[]   = selectedGroupId ? (items[String(selectedGroupId)] ?? []) : [];
 
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedIds((prev) => { const next = new Set(prev); filtered.forEach((i) => next.delete(i.id)); return next; });
-    } else {
-      setSelectedIds((prev) => { const next = new Set(prev); filtered.forEach((i) => next.add(i.id)); return next; });
+  const selectedMenuName  = menus.find((m) => m.id === selectedMenuId)?.name;
+  const selectedGroupName = selectedGroups.find((g) => g.id === selectedGroupId)?.name;
+
+  // ── 메뉴 체크박스 ──
+  const handleMenuCheck = (id: string) =>
+    setCheckedMenuIds((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  const handleAllCheck = () =>
+    setCheckedMenuIds(checkedMenuIds.size === menus.length ? new Set() : new Set(menus.map((m) => m.id)));
+
+  // ── 메뉴 선택 ──
+  const handleMenuRowClick = (id: string) => {
+    setSelectedMenuId((prev) => (prev === id ? null : id));
+    setSelectedGroupId(null);
+    setSelectedItemId(null);
+  };
+
+  // ── 메뉴 모달 ──
+  const openNewMenu = () => setMenuModal({ open: true, mode: 'new', targetId: null, name: '', usable: true });
+  const openEditMenu = (m: MenuRow, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuModal({ open: true, mode: 'edit', targetId: m.id, name: m.name, usable: m.usable });
+  };
+  const closeMenuModal = () => { setMenuModal(MENU_MODAL_INIT); setMenuNameError(undefined); };
+
+  const handleMenuModalSave = () => {
+    if (!menuModal.name.trim()) { setMenuNameError('메뉴명을 입력해 주세요.'); return; }
+    if (menuModal.mode === 'new') {
+      const newId = `m_${Date.now()}`;
+      setMenus((prev) => [...prev, { id: newId, name: menuModal.name, usable: menuModal.usable }]);
+      setGroups((prev) => ({ ...prev, [newId]: [] }));
+      setSelectedMenuId(newId);
+    } else if (menuModal.targetId) {
+      setMenus((prev) => prev.map((m) => m.id === menuModal.targetId ? { ...m, name: menuModal.name, usable: menuModal.usable } : m));
     }
-  };
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+    closeMenuModal();
   };
 
-  // Handlers
-  const handleAdd = () => {
-    setEditingItem(null);
-    setFormData({ type: 'single', required: false, status: 'active' });
-    setNewItems([{ id: '1', name: '', price: 0 }]);
-    setModalOpen(true);
-  };
-
-  const handleEdit = (item: OptionGroup) => {
-    setEditingItem(item);
-    setFormData(item);
-    setNewItems(item.items);
-    setModalOpen(true);
-  };
-
-  const handleSave = () => {
-    if (editingItem) {
-      setData(data.map((item) => item.id === editingItem.id ? { ...item, ...formData, items: newItems } : item));
+  // ── 메뉴 삭제 ──
+  const canDelete = checkedMenuIds.size > 0 || selectedMenuId !== null;
+  const openDelete = () => { setDeleteMode(checkedMenuIds.size > 0 ? 'checked' : 'single'); setDeleteOpen(true); };
+  const handleDelete = () => {
+    if (deleteMode === 'checked') {
+      setMenus((prev) => prev.filter((m) => !checkedMenuIds.has(m.id)));
+      if (selectedMenuId && checkedMenuIds.has(selectedMenuId)) setSelectedMenuId(null);
+      setCheckedMenuIds(new Set());
     } else {
-      setData([...data, {
-        id: String(Date.now()),
-        name: formData.name || '',
-        type: formData.type || 'single',
-        required: formData.required || false,
-        status: formData.status || 'active',
-        items: newItems,
-      }]);
+      setMenus((prev) => prev.filter((m) => m.id !== selectedMenuId));
+      setSelectedMenuId(null);
     }
-    setModalOpen(false);
+    setSelectedGroupId(null);
+    setSelectedItemId(null);
+    setDeleteOpen(false);
   };
 
-  const doDelete = () => {
-    if (!deleteTarget) return;
-    setData(data.filter((item) => item.id !== deleteTarget.id));
-    setSelectedIds((prev) => { const next = new Set(prev); next.delete(deleteTarget.id); return next; });
-    setDeleteTarget(null);
+  const deleteLabel =
+    deleteMode === 'single'
+      ? `"${menus.find((m) => m.id === selectedMenuId)?.name}" 메뉴`
+      : `선택한 ${checkedMenuIds.size}개 메뉴`;
+
+  // ── 그룹/항목 변경 ──
+  const handleGroupsChange = (rows: OptionGroupRow[]) => {
+    if (!selectedMenuId) return;
+    setGroups((prev) => ({ ...prev, [selectedMenuId]: rows }));
   };
 
-  const doBulkDelete = () => {
-    setData(data.filter((item) => !selectedIds.has(item.id)));
-    setSelectedIds(new Set());
-    setBulkDeleteOpen(false);
+  const handleItemsChange = (rows: OptionItemRow[]) => {
+    if (!selectedGroupId) return;
+    setItems((prev) => ({ ...prev, [String(selectedGroupId)]: rows }));
   };
 
-  const handleToggleStatus = (id: string) => {
-    setData(data.map((item) => item.id === id ? { ...item, status: item.status === 'active' ? 'inactive' : 'active' } : item));
+  // ── 그룹 행 선택 시 항목 패널 초기화 ──
+  const handleGroupSelect = (id: string | number | null) => {
+    setSelectedGroupId(id);
+    setSelectedItemId(null);
   };
 
-  const handleAddOptionItem = () => {
-    setNewItems([...newItems, { id: String(Date.now()), name: '', price: 0 }]);
-  };
-
-  const handleRemoveOptionItem = (id: string) => {
-    setNewItems(newItems.filter((item) => item.id !== id));
-  };
-
-  const handleUpdateOptionItem = (id: string, field: 'name' | 'price', value: string | number) => {
-    setNewItems(newItems.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
-  };
+  // ── 수정 모달 열기 ──
+  const handleEditGroup = (id: string | number) => setEditingGroupId(String(id));
+  const handleEditItem  = (id: string | number) => setEditingItemId(String(id));
 
   return (
-    <div className="p-4 md:p-5 lg:p-6 space-y-4">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-sm">
-        <span className="text-slate-400">메뉴 관리</span>
-        <span className="text-slate-300">/</span>
-        <span className="text-slate-800 font-medium">옵션 그룹 관리</span>
+    <div className="h-[calc(100vh-64px)] flex flex-col px-5 lg:px-6 pt-5 lg:pt-6 pb-4 gap-3">
+
+      {/* 브레드크럼 */}
+      <nav className="flex items-center gap-1.5 text-xs text-slate-400 shrink-0">
+        <span>메뉴 관리</span><span>/</span><span>메뉴 정보 관리</span><span>/</span>
+        <span className="text-slate-700 font-medium">옵션 관리</span>
       </nav>
 
-      {/* Search card */}
-      <div className="bg-white rounded-[6px] border border-slate-200 p-4">
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <InputField
-              inputSize="md"
-              placeholder="옵션 그룹명으로 검색"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              icon={Search}
-            />
-          </div>
-          {searchTerm && (
-            <Button variant="outline" size="md" leftIcon={<X size={14} />} onClick={() => setSearchTerm('')}>
-              초기화
-            </Button>
-          )}
+      {/* 검색 영역 */}
+      <div className="bg-white rounded-[6px] border border-slate-200 px-4 py-3 shrink-0 flex items-center gap-2">
+        <div className="flex-1 max-w-xs relative flex items-center">
+          <Search size={16} className="absolute left-3 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="메뉴명 검색"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') setSearchQuery(searchInput); }}
+            className="w-full pl-9 pr-3 h-10 text-sm border border-slate-200 rounded-[4px] bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#FF6B2B] focus:ring-1 focus:ring-[#FF6B2B]/30 transition-colors"
+          />
         </div>
+        <Button
+          variant="outline"
+          size="md"
+          leftIcon={<RotateCcw size={14} />}
+          onClick={() => { setSearchInput(''); setSearchQuery(''); }}
+        >
+          초기화
+        </Button>
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => setSearchQuery(searchInput)}
+        >
+          조회
+        </Button>
       </div>
 
-      {/* Table card */}
-      <div className="bg-white rounded-[6px] border border-slate-200 overflow-hidden">
-        {/* Table header */}
-        <div className="flex items-center justify-between px-4 md:px-5 py-3.5 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-medium text-slate-800">옵션 그룹 목록</h3>
-            <span className="text-xs text-slate-400">총 {filtered.length}개</span>
-            {selectedIds.size > 0 && (
-              <span className="inline-flex items-center gap-1 text-xs text-[#FF6B2B] font-medium bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full">
-                {selectedIds.size}개 선택됨
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="primary" size="sm" onClick={handleAdd} leftIcon={<Plus size={13} />}>
-              <span className="hidden sm:inline">옵션 그룹 추가</span>
-              <span className="sm:hidden">추가</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={selectedIds.size === 0}
-              onClick={() => setBulkDeleteOpen(true)}
-            >
-              {selectedIds.size > 0 ? `삭제 (${selectedIds.size})` : '삭제'}
-            </Button>
-          </div>
-        </div>
+      {/* ── 1/3 · 2/3 그리드, 전체 높이 채움 ── */}
+      <div className="flex gap-4 flex-1 min-h-0">
 
-        {/* Desktop Table (md+) */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-3 py-2.5 w-9">
-                  <CheckboxField
-                    size="sm"
-                    checked={allSelected}
-                    indeterminate={someSelected && !allSelected}
-                    onChange={toggleSelectAll}
-                  />
-                </th>
-                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500">그룹명</th>
-                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500">선택 타입</th>
-                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500">필수 선택</th>
-                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500">옵션 항목</th>
-                <th className="text-center px-3 py-2.5 text-xs font-medium text-slate-500">상태</th>
-                <th className="text-center px-3 py-2.5 text-xs font-medium text-slate-500">관리</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-3 py-12 text-center text-slate-400">
-                    검색 결과가 없습니다
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((item) => {
-                  const isSelected = selectedIds.has(item.id);
-                  return (
-                    <tr key={item.id} className={`transition-colors ${isSelected ? 'bg-[#FF6B2B]/5' : 'hover:bg-slate-50'}`}>
-                      <td className="px-3 py-2.5">
-                        <CheckboxField size="sm" checked={isSelected} onChange={() => toggleSelectOne(item.id)} />
-                      </td>
-                      <td className="px-3 py-2.5 font-medium text-slate-800">{item.name}</td>
-                      <td className="px-3 py-2.5">
-                        <Tag variant="outline" size="sm">
-                          {item.type === 'single' ? '단일 선택' : '다중 선택'}
-                        </Tag>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {item.required ? (
-                          <Tag color="orange" variant="soft" size="sm">필수</Tag>
-                        ) : (
-                          <Tag variant="outline" color="gray" size="sm">선택</Tag>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="space-y-1">
-                          {item.items.map((opt, idx) => (
-                            <div key={idx} className="text-xs text-slate-600">
-                              {opt.name}
-                              {opt.price !== 0 && (
-                                <span className="text-slate-400">
-                                  {' '}({opt.price > 0 ? '+' : ''}{opt.price.toLocaleString()}원)
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex justify-center">
-                          <Toggle size="sm" checked={item.status === 'active'} onChange={() => handleToggleStatus(item.id)} />
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <Button
-                          variant="icon"
-                          size="sm"
-                          onClick={() => handleEdit(item)}
-                          iconOnly={<Pencil size={13} />}
-                          className="text-slate-400 hover:text-[#FF6B2B] hover:bg-orange-50"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile Card List (< md) */}
-        <div className="md:hidden divide-y divide-slate-100">
-          {filtered.length === 0 ? (
-            <div className="px-4 py-12 text-center text-slate-400">검색 결과가 없습니다</div>
-          ) : (
-            filtered.map((item) => {
-              const isSelected = selectedIds.has(item.id);
+        {/* ① 왼쪽 1/3 : 메뉴 목록 (전체 높이) */}
+        <div className="w-1/3 shrink-0 bg-white rounded-[6px] border border-slate-200 flex flex-col overflow-hidden">
+          {/* 헤더 */}
+          <div className="flex items-center gap-2 px-4 h-[44px] border-b border-slate-100 shrink-0">
+            <span className="text-sm font-medium text-slate-800">메뉴 목록</span>
+            <span className="text-xs bg-[#FF6B2B]/10 text-[#FF6B2B] px-2 py-0.5 rounded-[3px] font-medium">
+              {filteredMenus.length}건
+            </span>
+          </div>
+          {/* 목록 (메뉴명만) */}
+          <div className="flex-1 overflow-y-auto">
+            {filteredMenus.map((menu) => {
+              const isSelected = selectedMenuId === menu.id;
               return (
-                <div key={item.id} className={`px-4 py-3.5 transition-colors ${isSelected ? 'bg-[#FF6B2B]/5' : 'hover:bg-slate-50'}`}>
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1 shrink-0">
-                      <CheckboxField size="sm" checked={isSelected} onChange={() => toggleSelectOne(item.id)} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                            <span className="font-medium text-slate-800 text-sm">{item.name}</span>
-                            <Tag variant="outline" size="sm">{item.type === 'single' ? '단일' : '다중'}</Tag>
-                            {item.required ? (
-                              <Tag color="orange" variant="soft" size="sm">필수</Tag>
-                            ) : (
-                              <Tag variant="outline" color="gray" size="sm">선택</Tag>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {item.items.slice(0, 4).map((opt, idx) => (
-                              <span key={idx} className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-[3px]">
-                                {opt.name}
-                                {opt.price !== 0 && (
-                                  <span className="text-slate-400 ml-0.5">({opt.price > 0 ? '+' : ''}{opt.price.toLocaleString()}원)</span>
-                                )}
-                              </span>
-                            ))}
-                            {item.items.length > 4 && <span className="text-xs text-slate-400">+{item.items.length - 4}개</span>}
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-2 shrink-0">
-                          <Toggle size="sm" checked={item.status === 'active'} onChange={() => handleToggleStatus(item.id)} />
-                          <Button
-                            variant="icon"
-                            size="sm"
-                            onClick={() => handleEdit(item)}
-                            iconOnly={<Pencil size={13} />}
-                            className="text-slate-400 hover:text-[#FF6B2B] hover:bg-orange-50"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                <button
+                  key={menu.id}
+                  onClick={() => handleMenuRowClick(menu.id)}
+                  className={[
+                    'w-full text-left px-4 py-2.5 text-sm border-b border-slate-100 last:border-b-0 transition-colors border-l-2',
+                    isSelected
+                      ? 'bg-[#FF6B2B]/5 border-l-[#FF6B2B] text-[#FF6B2B] font-medium'
+                      : 'border-l-transparent hover:bg-slate-50 text-slate-700',
+                  ].join(' ')}
+                >
+                  {menu.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ② 오른쪽 2/3 : 옵션 그룹(위 50%) + 옵션 항목(아래 50%) */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
+
+          {/* 옵션 그룹 — 위 50% */}
+          <div className="flex-1 min-h-0">
+            {selectedMenuId ? (
+              <InlineEditTable<OptionGroupRow>
+                title="옵션 그룹"
+                badge={selectedMenuName}
+                columns={GROUP_COLUMNS}
+                rows={selectedGroups}
+                selectedId={selectedGroupId}
+                onSelect={handleGroupSelect}
+                onChange={handleGroupsChange}
+                newRowDefaults={GROUP_DEFAULTS}
+                onSave={handleGroupSave}
+                savedMsg={groupSaved}
+                emptyText="옵션 그룹이 없습니다. 행추가로 등록하세요."
+                onEditRow={handleEditGroup}
+                scrollable
+                className="h-full"
+              />
+            ) : (
+              <div className="h-full bg-white rounded-[6px] border border-slate-200 flex flex-col">
+                <div className="px-4 h-[44px] flex items-center border-b border-slate-100 shrink-0">
+                  <span className="text-sm font-medium text-slate-800">옵션 그룹</span>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 select-none">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                    <MousePointerClick size={22} className="text-slate-300" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-slate-500 font-medium">메뉴를 선택해주세요</p>
+                    <p className="text-xs text-slate-400 mt-0.5">왼쪽 목록에서 메뉴를 클릭하면 옵션 그룹이 표시됩니다.</p>
                   </div>
                 </div>
-              );
-            })
-          )}
+              </div>
+            )}
+          </div>
+
+          {/* 옵션 항목 — 아래 50% */}
+          <div className="flex-1 min-h-0">
+            {selectedGroupId ? (
+              <InlineEditTable<OptionItemRow>
+                title="옵션 항목"
+                badge={selectedGroupName}
+                columns={ITEM_COLUMNS}
+                rows={selectedItems}
+                selectedId={selectedItemId}
+                onSelect={setSelectedItemId}
+                onChange={handleItemsChange}
+                newRowDefaults={ITEM_DEFAULTS}
+                onSave={handleItemSave}
+                savedMsg={itemSaved}
+                emptyText="옵션 항목이 없습니다. 행추가로 등록하세요."
+                onEditRow={handleEditItem}
+                scrollable
+                className="h-full"
+              />
+            ) : (
+              <div className="h-full bg-white rounded-[6px] border border-slate-200 flex flex-col">
+                <div className="px-4 h-[44px] flex items-center border-b border-slate-100 shrink-0">
+                  <span className="text-sm font-medium text-slate-800">옵션 항목</span>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 select-none">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                    <MousePointerClick size={22} className="text-slate-300" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-slate-500 font-medium">옵션 그룹을 선택해주세요</p>
+                    <p className="text-xs text-slate-400 mt-0.5">옵션 그룹 행을 클릭하면 옵션 항목이 표시됩니다.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* ── 삭제 확인 모달 ── */}
       <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        size="lg"
-        title={editingItem ? '옵션 그룹 수정' : '옵션 그룹 추가'}
+        open={deleteOpen} onClose={() => setDeleteOpen(false)} size="sm"
+        footer={<><ModalBtn variant="outline" onClick={() => setDeleteOpen(false)}>취소</ModalBtn><ModalBtn variant="danger" onClick={handleDelete}>삭제</ModalBtn></>}
+      >
+        <div className="text-center py-2 space-y-3">
+          <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+            <span className="text-2xl text-red-400">−</span>
+          </div>
+          <p className="font-medium text-slate-800">{deleteLabel}를 삭제하시겠습니까?</p>
+          <p className="text-sm text-slate-500">삭제된 데이터는 복구할 수 없습니다.</p>
+        </div>
+      </Modal>
+
+      {/* ── 메뉴 신규/수정 모달 ── */}
+      <Modal
+        open={menuModal.open} onClose={closeMenuModal} size="sm"
+        title={menuModal.mode === 'new' ? '메뉴 신규 등록' : '메뉴 수정'}
         footer={
           <>
-            <ModalBtn variant="outline" onClick={() => setModalOpen(false)}>취소</ModalBtn>
-            <ModalBtn variant="primary" onClick={handleSave}>{editingItem ? '수정' : '추가'}</ModalBtn>
+            <ModalBtn variant="outline" onClick={closeMenuModal}>닫기</ModalBtn>
+            <ModalBtn variant="primary" onClick={handleMenuModalSave} disabled={!menuModal.name.trim()}>저장</ModalBtn>
           </>
         }
       >
         <div className="space-y-4">
-          <InputField
-            label="그룹명"
-            required
-            value={formData.name || ''}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="예: 맵기 조절, 사이즈 선택"
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                선택 타입 <span className="text-red-500">*</span>
-              </label>
-              <div className="space-y-2">
-                <RadioField
-                  label="단일 선택"
-                  value="single"
-                  checked={formData.type === 'single'}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as 'single' })}
-                />
-                <RadioField
-                  label="다중 선택"
-                  value="multiple"
-                  checked={formData.type === 'multiple'}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as 'multiple' })}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">필수 선택</label>
-              <CheckboxField
-                label="고객이 반드시 선택해야 함"
-                checked={formData.required || false}
-                onChange={(e) => setFormData({ ...formData, required: e.target.checked })}
-              />
-            </div>
-          </div>
-
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-slate-700">
-                옵션 항목 <span className="text-red-500">*</span>
-              </label>
-              <Button variant="outline" size="sm" onClick={handleAddOptionItem} leftIcon={<Plus size={13} />}>항목 추가</Button>
-            </div>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-              {newItems.map((item) => (
-                <div key={item.id} className="flex gap-2 items-start">
-                  <div className="flex-1">
-                    <InputField inputSize="sm" placeholder="옵션명" value={item.name}
-                      onChange={(e) => handleUpdateOptionItem(item.id, 'name', e.target.value)} />
-                  </div>
-                  <div className="w-[120px] sm:w-[140px]">
-                    <InputField inputSize="sm" type="number" placeholder="0" value={item.price}
-                      onChange={(e) => handleUpdateOptionItem(item.id, 'price', Number(e.target.value))} suffix="원" />
-                  </div>
-                  <Button
-                    variant="icon"
-                    size="sm"
-                    iconOnly={<Trash2 size={13} />}
-                    onClick={() => handleRemoveOptionItem(item.id)}
-                    disabled={newItems.length === 1}
-                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 mt-0.5"
-                  />
-                </div>
-              ))}
-            </div>
+            <label className="block text-xs text-slate-500 mb-1.5">메뉴명 <span className="text-red-400">*</span></label>
+            <InputField
+              inputSize="md"
+              value={menuModal.name}
+              onChange={(e) => { setMenuModal((p) => ({ ...p, name: e.target.value })); setMenuNameError(undefined); }}
+              placeholder="예: 불고기 정식"
+              errorText={menuNameError}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-2">사용여부 <span className="text-red-400">*</span></label>
+            <CheckboxField size="md" label="사용" checked={menuModal.usable} onChange={(e) => setMenuModal((p) => ({ ...p, usable: e.target.checked }))} />
           </div>
         </div>
       </Modal>
 
-      {/* 단건 삭제 Modal */}
-      <Modal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        size="sm"
-        title="옵션 그룹 삭제"
-        footer={
-          <>
-            <ModalBtn variant="outline" onClick={() => setDeleteTarget(null)}>취소</ModalBtn>
-            <ModalBtn variant="danger" onClick={doDelete}>삭제</ModalBtn>
-          </>
-        }
-      >
-        {deleteTarget && (
-          <div className="flex items-start gap-2.5">
-            <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm text-slate-700"><strong>"{deleteTarget.name}"</strong> 옵션 그룹을 삭제하시겠습니까?</p>
-              <p className="text-xs text-slate-500 mt-1">이 작업은 되돌릴 수 없습니다.</p>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* 다건 삭제 Modal */}
-      <Modal
-        open={bulkDeleteOpen}
-        onClose={() => setBulkDeleteOpen(false)}
-        size="sm"
-        title="선택 옵션 그룹 삭제"
-        footer={
-          <>
-            <ModalBtn variant="outline" onClick={() => setBulkDeleteOpen(false)}>취소</ModalBtn>
-            <ModalBtn variant="danger" onClick={doBulkDelete}>삭제</ModalBtn>
-          </>
-        }
-      >
-        <div className="flex items-start gap-2.5">
-          <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm text-slate-700">선택한 <strong>{selectedIds.size}개</strong> 옵션 그룹을 모두 삭제하시겠습니까?</p>
-            <p className="text-xs text-slate-500 mt-1">이 작업은 되돌릴 수 없습니다.</p>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

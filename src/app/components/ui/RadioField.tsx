@@ -60,6 +60,7 @@ export function RadioField({
         disabled={isDisabled}
         checked={isChecked}
         onChange={onChange}
+        readOnly={!onChange}
       />
 
       {/* Visual radio */}

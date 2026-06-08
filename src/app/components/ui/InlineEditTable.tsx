@@ -7,21 +7,23 @@
  * - 행 클릭으로 선택 / 재클릭으로 해제
  * - 헤더 툴바: ↑ ↓  +행추가  −행삭제  저장
  * - 신규 행: 연한 앰버 배경, 선택 행: 주황 좌측 border
- * - 컬럼 타입: 'input' | 'input-readonly' | 'checkbox'
+ * - 컬럼 타입: 'input' | 'input-readonly' | 'checkbox' | 'select'
  *   - 'input'          → 항상 편집 가능
  *   - 'input-readonly' → 기존 행은 readOnly, 신규 행만 편집 가능
  *   - 'checkbox'       → CheckboxField (boolean 값)
+ *   - 'select'         → SelectField (options 필수)
  */
 
 import React, { useState } from 'react';
-import { ChevronUp, ChevronDown, Check } from 'lucide-react';
+import { ChevronUp, ChevronDown, Check, Pencil } from 'lucide-react';
 import { Button } from './Button';
 import { InputField } from './InputField';
 import { CheckboxField } from './CheckboxField';
+import { SelectField } from './SelectField';
 
 // ─── Types ───────────────────────────────────────────────────────
 
-export type InlineColumnType = 'input' | 'input-readonly' | 'checkbox';
+export type InlineColumnType = 'input' | 'input-readonly' | 'checkbox' | 'select';
 
 export interface InlineColumnDef<T> {
   /** 데이터 키 */
@@ -34,6 +36,8 @@ export interface InlineColumnDef<T> {
   className?: string;
   /** InputField placeholder */
   placeholder?: string;
+  /** SelectField options (type='select'일 때 필수) */
+  options?: Array<{ value: string; label: string }>;
 }
 
 export interface InlineRow {
@@ -69,6 +73,12 @@ export interface InlineEditTableProps<T extends InlineRow> {
   emptyText?: string;
   /** 테이블 비활성화 (행추가·삭제·저장 버튼 disabled) */
   disabled?: boolean;
+  /** 외부 컨테이너 className (예: 고정 높이 레이아웃에서 h-full 전달) */
+  className?: string;
+  /** true이면 테이블 영역이 flex-1 overflow-y-auto로 스크롤됨 */
+  scrollable?: boolean;
+  /** 행별 수정 아이콘 콜백 — 제공 시 맨 오른쪽에 연필 아이콘 컬럼이 추가됨 */
+  onEditRow?: (id: string | number) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────
@@ -87,6 +97,9 @@ export function InlineEditTable<T extends InlineRow>({
   savedMsg = false,
   emptyText = '데이터가 없습니다.',
   disabled = false,
+  className = '',
+  scrollable = false,
+  onEditRow,
 }: InlineEditTableProps<T>) {
   const selectedIdx = rows.findIndex((r) => r.id === selectedId);
 
@@ -153,6 +166,19 @@ export function InlineEditTable<T extends InlineRow>({
       );
     }
 
+    if (type === 'select') {
+      return (
+        <td key={String(col.key)} className="px-3 py-[5px]">
+          <SelectField
+            selectSize="sm"
+            value={String(value ?? '')}
+            onChange={(e) => updateCell(row.id, col.key, e.target.value)}
+            options={col.options ?? []}
+          />
+        </td>
+      );
+    }
+
     const isReadOnly = type === 'input-readonly' && !row.isNew;
     return (
       <td key={String(col.key)} className="px-3 py-[5px]">
@@ -169,10 +195,10 @@ export function InlineEditTable<T extends InlineRow>({
 
   /* ── Render ── */
   return (
-    <div className="border border-slate-200 rounded-[6px] overflow-hidden bg-white">
+    <div className={`border border-slate-200 rounded-[6px] bg-white ${scrollable ? 'flex flex-col overflow-hidden' : 'overflow-hidden'} ${className}`}>
 
       {/* 툴바 */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 bg-white">
+      <div className="flex items-center justify-between px-4 h-[44px] border-b border-slate-100 bg-white">
         {/* 좌측: 타이틀 + 배지 */}
         <div className="flex items-center gap-2">
           {title && (
@@ -247,7 +273,7 @@ export function InlineEditTable<T extends InlineRow>({
       </div>
 
       {/* 테이블 */}
-      <div className="overflow-x-auto">
+      <div className={scrollable ? 'flex-1 overflow-auto' : 'overflow-x-auto'}>
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
@@ -256,6 +282,7 @@ export function InlineEditTable<T extends InlineRow>({
                   {col.label}
                 </th>
               ))}
+              {onEditRow && <th className="w-10 px-2 py-2.5" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -285,6 +312,17 @@ export function InlineEditTable<T extends InlineRow>({
                     ].join(' ')}
                   >
                     {columns.map((col) => renderCell(row, col))}
+                    {onEditRow && (
+                      <td className="px-2 py-[5px] text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => onEditRow(row.id)}
+                          className="w-6 h-6 flex items-center justify-center rounded-[4px] text-slate-300 hover:text-[#FF6B2B] hover:bg-[#FF6B2B]/8 transition-colors mx-auto"
+                          title="수정"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })

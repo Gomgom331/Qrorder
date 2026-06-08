@@ -77,6 +77,7 @@ export function CheckboxField({
         disabled={isDisabled}
         checked={isChecked}
         onChange={onChange}
+        readOnly={!onChange}
       />
       {/* Visual checkbox */}
       <span

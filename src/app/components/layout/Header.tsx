@@ -24,6 +24,7 @@ const routeMeta: Record<string, { breadcrumb: string[] }> = {
   '/': { breadcrumb: ['홈', '대시보드'] },
   '/orders/realtime': { breadcrumb: ['주문 관리', '실시간 주문'] },
   '/orders/history': { breadcrumb: ['주문 관리', '주문 내역'] },
+  '/orders/status': { breadcrumb: ['주문 관리', '주문 상태 관리'] },
   '/stores/qr': { breadcrumb: ['QR 매장 관리', 'QR 코드 관리'] },
   '/stores/tables': { breadcrumb: ['QR 매장 관리', '테이블 관리'] },
   '/menus': { breadcrumb: ['메뉴 관리', '메뉴 등록 · 관리'] },

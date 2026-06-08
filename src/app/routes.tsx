@@ -12,6 +12,8 @@ import { CommonCodeManagement } from './pages/CommonCodeManagement';
 import { RuleManagement } from './pages/RuleManagement';
 import { SystemMenuManagement } from './pages/SystemMenuManagement';
 import { MessageManagement } from './pages/MessageManagement';
+import { TableManagement } from './pages/TableManagement';
+import { StoreInfoManagement } from './pages/StoreInfoManagement';
 import { PaymentPlanManagement } from './pages/PaymentPlanManagement';
 import { BusinessStatusInquiry } from './pages/BusinessStatusInquiry';
 import { CouponManagement } from './pages/CouponManagement';
@@ -21,6 +23,7 @@ import { AdminManagement } from './pages/AdminManagement';
 import { AdminNoticeManagement } from './pages/AdminNoticeManagement';
 import { BoardNoticeManagement } from './pages/BoardNoticeManagement';
 import { BoardInquiryManagement } from './pages/BoardInquiryManagement';
+import { UserManagement } from './pages/UserManagement';
 import { ModalDemo } from './pages/ModalDemo';
 import { TagGuide } from './pages/TagGuide';
 import { InputGuide } from './pages/InputGuide';
@@ -59,6 +62,9 @@ import { ClientMenuCardGuide } from './pages/client/ClientMenuCardGuide';
 import { CustomerQRScan } from './pages/order/CustomerQRScan';
 import { CustomerMenuPage } from './pages/order/CustomerMenuPage';
 
+// Order Status Management
+import OrderStatusManagement from './pages/OrderStatusManagement';
+
 export const router = createBrowserRouter([
   { path: '/login', Component: Login },
   { path: '/client/login', Component: ClientLogin },
@@ -72,8 +78,10 @@ export const router = createBrowserRouter([
       { index: true, Component: Dashboard },
       { path: 'orders/realtime', Component: Orders },
       { path: 'orders/history', Component: Orders },
+      { path: 'orders/status', Component: OrderStatusManagement },
       { path: 'stores/qr', Component: QrManagement },
-      { path: 'stores/tables', Component: QrManagement },
+      { path: 'stores/tables', Component: TableManagement },
+      { path: 'stores/info', Component: StoreInfoManagement },
       { path: 'menus', Component: MenuRegister },
       { path: 'menus/categories', Component: MenuManagement },
       { path: 'menus/options', Component: MenuManagement },
@@ -82,12 +90,14 @@ export const router = createBrowserRouter([
       { path: 'system/rules', Component: RuleManagement },
       { path: 'system/menus', Component: SystemMenuManagement },
       { path: 'system/messages', Component: MessageManagement },
+      { path: 'system/tables', Component: TableManagement },
       { path: 'system/payment-plans', Component: PaymentPlanManagement },
       { path: 'system/business-status', Component: BusinessStatusInquiry },
       { path: 'system/coupons', Component: CouponManagement },
       { path: 'system/access-logs', Component: AccessLogInquiry },
       { path: 'system/change-history', Component: ChangeHistoryInquiry },
       { path: 'system/users', Component: AdminManagement },
+      { path: 'system/user-management', Component: UserManagement },
       { path: 'system/stats', Component: Dashboard },
       { path: 'system/notices', Component: AdminNoticeManagement },
       // 게시판 관리

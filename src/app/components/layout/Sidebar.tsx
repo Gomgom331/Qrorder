@@ -60,6 +60,7 @@ const navItems: NavItem[] = [
     children: [
       { type: 'leaf', label: '실시간 주문', path: '/orders/realtime' },
       { type: 'leaf', label: '주문 내역', path: '/orders/history' },
+      { type: 'leaf', label: '주문 상태 관리', path: '/orders/status' },
     ],
   },
   {
@@ -67,6 +68,7 @@ const navItems: NavItem[] = [
     children: [
       { type: 'leaf', label: 'QR 코드 관리', path: '/stores/qr' },
       { type: 'leaf', label: '테이블 관리', path: '/stores/tables' },
+      { type: 'leaf', label: '매장관리정보', path: '/stores/info' },
     ],
   },
   {
@@ -93,6 +95,7 @@ const navItems: NavItem[] = [
           { type: 'leaf', label: '공통코드 관리',    path: '/system/common-codes' },
           { type: 'leaf', label: '메뉴 관리',        path: '/system/menus' },
           { type: 'leaf', label: '메시지 관리',      path: '/system/messages' },
+          { type: 'leaf', label: '테이블 관리',      path: '/system/tables' },
           { type: 'leaf', label: '규칙 관리',        path: '/system/rules' },
           { type: 'leaf', label: '변경이력조회',     path: '/system/change-history' },
         ],
