@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { Layout } from './components/layout/Layout';
 import { ClientLayout } from './components/layout/ClientLayout';
 import { Dashboard } from './pages/Dashboard';
@@ -66,6 +66,7 @@ import { CustomerMenuPage } from './pages/order/CustomerMenuPage';
 import OrderStatusManagement from './pages/OrderStatusManagement';
 
 export const router = createBrowserRouter([
+  { path: '/', element: <Navigate to="/order" replace /> },
   { path: '/login', Component: Login },
   { path: '/client/login', Component: ClientLogin },
   // Customer front-office (standalone, no admin layout)

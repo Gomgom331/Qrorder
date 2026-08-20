@@ -1,302 +1,405 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import svgPaths from "@/imports/로딩-1/svg-goi3txa2gz";
 import { useParams } from 'react-router';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ShoppingCart, Bell, X, Plus, Minus, Check, ChevronRight,
-  Clock, Flame, Star, Zap, Package, AlertTriangle, ChevronDown,
-  Info, Utensils, Droplets, CreditCard, HelpCircle, RefreshCw, Trash2,
+  ShoppingCart, Bell, X, Plus, Minus, Check, Search, Users,
+  Flame, Star, Zap, Package, AlertTriangle, RefreshCw,
+  Utensils, Clock, Loader2,
+  Receipt, ChevronRight, Settings,
 } from 'lucide-react';
 
+// ─── Design System constants ─────────────────────────────────────
+const PRIMARY = '#FF6B2B';
+
 // ─── Types ────────────────────────────────────────────────────────
-type Phase = 'loading' | 'menu' | 'ordered';
+type Phase = 'loading' | 'menu' | 'complete' | 'session-timeout' | 'session-closed';
 type MenuBadge = 'popular' | 'recommended' | 'limited';
 
-interface OptionChoice {
-  id: string;
-  label: string;
-  priceAdd: number; // 0 = no extra charge
-}
-
+interface OptionChoice { id: string; label: string; priceAdd: number; }
 interface OptionGroup {
-  id: string;
-  label: string;
-  required: boolean;
-  multiple: boolean; // true = checkbox, false = radio
-  choices: OptionChoice[];
+  id: string; label: string; required: boolean;
+  multiple: boolean; choices: OptionChoice[];
 }
-
 interface MenuItem {
-  id: string;
-  name: string;
-  category: string;
-  price: number;
-  status: 'active' | 'soldout';
-  description: string;
-  image?: string;
-  badges: MenuBadge[];
-  limitedQty?: number;
-  timeSalePrice?: number;
-  optionGroups?: OptionGroup[];
-  allergyInfo?: string;
-  kcal?: number;
+  id: string; name: string; category: string; price: number;
+  status: 'active' | 'soldout'; description?: string; image?: string;
+  badges: MenuBadge[]; limitedQty?: number; timeSalePrice?: number;
+  optionGroups?: OptionGroup[]; allergyInfo?: string; kcal?: number;
 }
-
-interface SelectedOptions {
-  [groupId: string]: string[]; // choiceId[]
-}
-
+interface SelectedOptions { [groupId: string]: string[]; }
+interface MultiQtyMap { [choiceKey: string]: number; }
+interface OptionLine { label: string; priceAdd: number; qty: number; }
 interface CartItem {
-  cartKey: string; // menuId + option fingerprint
-  menuId: string;
-  name: string;
-  optionLabel?: string;
-  price: number;       // base price (sale or original)
-  originalPrice: number;
-  optionPrice: number; // accumulated option adds
-  qty: number;
+  cartKey: string; menuId: string; name: string;
+  optionLabel?: string; optionLines?: OptionLine[]; price: number; optionPrice: number; qty: number;
 }
+interface OrderRecord { orderId: string; time: string; items: CartItem[]; total: number; }
 
-// ─── Mock Data ────────────────────────────────────────────────────
-const STORES: Record<string, { name: string; notice?: string; emoji: string }> = {
-  demo: {
-    name: '맛나한식당',
-    emoji: '🍚',
-    notice: '🔥 런치 특가! 11:00–14:00 불고기 정식 20% 할인 중',
-  },
+// ─── Badge config (matches ClientMenuCardGuide) ───────────────────
+const BADGE_CFG: Record<MenuBadge, { label: string; Icon: React.ElementType; cls: string }> = {
+  popular:     { label: '인기',     Icon: Flame, cls: 'bg-red-50 text-red-500 border border-red-100' },
+  recommended: { label: '추천',     Icon: Star,  cls: 'bg-amber-50 text-amber-500 border border-amber-100' },
+  limited:     { label: '한정수량', Icon: Zap,   cls: 'bg-purple-50 text-purple-500 border border-purple-100' },
 };
 
-const CATEGORIES = ['전체', '한식', '일식', '음료', '디저트'];
-
+// ─── Mock Data ────────────────────────────────────────────────────
+const STORES: Record<string, { name: string; notice?: string }> = {
+  demo: { name: '맛나한식당', notice: '🔥 런치 특가! 11:00–14:00 불고기 정식 타임세일 진행 중' },
+};
+const CATEGORIES = ['전체', '한식', '일식', '중식', '양식', '분식', '음료', '디저트', '사이드', '주류'];
+const TEST_CATEGORY = '🧪 테스트';
 const MENU_ITEMS: MenuItem[] = [
   {
     id: '1', name: '불고기 정식', category: '한식', price: 12000, status: 'active',
-    description: '국내산 소고기를 특제 양념에 재워 구운 불고기와 밥, 국, 반찬이 함께 나옵니다. 계절 제철 반찬 4~5가지와 함께 제공되며 공기밥은 무한 리필 가능합니다.',
+    description: '국내산 소고기를 특제 양념에 재워 구운 불고기와 밥, 국, 반찬이 함께 나옵니다.',
     image: 'https://images.unsplash.com/photo-1708388463872-1be875a0ba6a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-    badges: ['popular', 'recommended'], timeSalePrice: 9600,
-    kcal: 720, allergyInfo: '대두, 밀, 우유',
+    badges: ['popular', 'recommended'], timeSalePrice: 9600, kcal: 720, allergyInfo: '대두, 밀, 우유',
     optionGroups: [
-      {
-        id: 'spicy', label: '맵기 선택', required: true, multiple: false,
-        choices: [
-          { id: 'mild', label: '순한맛', priceAdd: 0 },
-          { id: 'medium', label: '보통맛', priceAdd: 0 },
-          { id: 'hot', label: '매운맛', priceAdd: 0 },
-        ],
-      },
-      {
-        id: 'add', label: '추가 선택', required: false, multiple: true,
-        choices: [
-          { id: 'egg', label: '계란후라이 추가', priceAdd: 500 },
-          { id: 'rice', label: '공기밥 추가', priceAdd: 1000 },
-          { id: 'soup', label: '국 추가', priceAdd: 1000 },
-        ],
-      },
+      { id: 'spicy', label: '맵기 선택', required: true, multiple: false, choices: [
+        { id: 'mild', label: '순한맛', priceAdd: 0 },
+        { id: 'medium', label: '보통맛', priceAdd: 0 },
+        { id: 'hot', label: '매운맛', priceAdd: 0 },
+      ]},
+      { id: 'add', label: '추가 선택', required: false, multiple: true, choices: [
+        { id: 'egg', label: '계란후라이 추가', priceAdd: 500 },
+        { id: 'rice', label: '공기밥 추가', priceAdd: 1000 },
+        { id: 'soup', label: '국 추가', priceAdd: 1000 },
+      ]},
     ],
   },
   {
     id: '2', name: '김치찌개', category: '한식', price: 8000, status: 'active',
-    description: '2년 이상 숙성한 묵은지로 끓인 얼큰하고 깊은 맛의 김치찌개입니다. 공기밥이 포함됩니다.',
+    description: '2년 이상 숙성한 묵은지로 끓인 얼큰하고 깊은 맛의 김치찌개. 공기밥 포함.',
     image: 'https://images.unsplash.com/photo-1676686997059-fb817ebbb2b5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-    badges: ['popular'], kcal: 480, allergyInfo: '대두',
-    timeSalePrice: 6500,
+    badges: ['popular'], timeSalePrice: 6500, kcal: 480, allergyInfo: '대두',
     optionGroups: [
-      {
-        id: 'meat', label: '고기 선택', required: true, multiple: false,
-        choices: [
-          { id: 'pork', label: '돼지고기', priceAdd: 0 },
-          { id: 'tuna', label: '참치', priceAdd: 0 },
-          { id: 'seafood', label: '해물', priceAdd: 2000 },
-        ],
-      },
+      { id: 'meat', label: '고기 선택', required: true, multiple: false, choices: [
+        { id: 'pork', label: '돼지고기', priceAdd: 0 },
+        { id: 'tuna', label: '참치', priceAdd: 0 },
+        { id: 'seafood', label: '해물', priceAdd: 2000 },
+      ]},
     ],
   },
-  {
-    id: '3', name: '된장찌개', category: '한식', price: 8000, status: 'active',
-    description: '구수한 재래식 된장으로 끓인 두부 된장찌개입니다. 공기밥이 포함됩니다.',
-    image: 'https://images.unsplash.com/photo-1535923054316-5f75572def8c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-    badges: [], kcal: 390, allergyInfo: '대두',
-  },
+  { id: '3', name: '된장찌개', category: '한식', price: 8000, status: 'active', description: '구수한 재래식 된장으로 끓인 두부 된장찌개. 공기밥 포함.', image: 'https://images.unsplash.com/photo-1535923054316-5f75572def8c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400', badges: [], kcal: 390, allergyInfo: '대두' },
   {
     id: '4', name: '비빔밥', category: '한식', price: 9000, status: 'active',
-    description: '고소한 참기름과 고추장으로 비벼 먹는 전통 돌솥 비빔밥입니다.',
+    description: '고소한 참기름과 고추장으로 비벼 먹는 전통 돌솥 비빔밥.',
     image: 'https://images.unsplash.com/photo-1741295017668-c8132acd6fc0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-    badges: ['recommended', 'limited'], limitedQty: 30, kcal: 650,
-    timeSalePrice: 7500,
+    badges: ['recommended', 'limited'], limitedQty: 18, kcal: 650,
+    optionGroups: [
+      { id: 'spicy', label: '맵기 선택', required: true, multiple: false, choices: [
+        { id: 'mild', label: '순한맛', priceAdd: 0 },
+        { id: 'medium', label: '보통맛', priceAdd: 0 },
+        { id: 'hot', label: '매운맛', priceAdd: 0 },
+      ]},
+      { id: 'topping', label: '토핑 추가', required: false, multiple: true, choices: [
+        { id: 'egg', label: '계란후라이 추가', priceAdd: 500 },
+        { id: 'cheese', label: '치즈 추가', priceAdd: 800 },
+        { id: 'beef', label: '불고기 추가', priceAdd: 2000 },
+      ]},
+    ],
   },
   {
     id: '5', name: '제육볶음', category: '한식', price: 11000, status: 'active',
-    description: '매콤달콤한 양념에 볶은 제육볶음입니다. 공기밥 및 반찬이 포함됩니다.',
+    description: '매콤달콤한 양념에 볶은 제육볶음. 공기밥 및 반찬 포함.',
     image: 'https://images.unsplash.com/photo-1708388064278-707e85eaddc0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-    badges: ['limited'], limitedQty: 15, kcal: 820, allergyInfo: '대두, 밀',
-    timeSalePrice: 8800,
-  },
-  {
-    id: '6', name: '돈까스', category: '일식', price: 10000, status: 'active',
-    description: '바삭하게 튀긴 국내산 등심 돈까스입니다. 소스와 샐러드, 공기밥이 포함됩니다.',
-    image: 'https://images.unsplash.com/photo-1734775373504-ff24ea8419b2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-    badges: ['popular'], kcal: 760, allergyInfo: '밀, 우유, 계란',
-  },
-  {
-    id: '7', name: '우동', category: '일식', price: 7000, status: 'soldout',
-    description: '부드러운 면발의 따뜻한 일본식 우동입니다.',
-    image: 'https://images.unsplash.com/photo-1725121463846-b23056f190df?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-    badges: [], kcal: 420,
-  },
-  {
-    id: '8', name: '카레라이스', category: '일식', price: 8500, status: 'active',
-    description: '부드러운 감자와 당근이 들어간 진한 일본식 카레라이스입니다.',
-    image: 'https://images.unsplash.com/photo-1679279726937-122c49626802?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-    badges: ['recommended'], kcal: 680,
-    timeSalePrice: 7000,
-  },
-  {
-    id: '9', name: '레몬에이드', category: '음료', price: 4500, status: 'active',
-    description: '신선한 레몬으로 만든 상큼하고 시원한 레몬에이드입니다.',
-    image: 'https://images.unsplash.com/photo-1739138056344-3c852f4efc28?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-    badges: [], kcal: 120,
-    timeSalePrice: 3500,
+    badges: ['limited'], limitedQty: 10, kcal: 820, allergyInfo: '대두, 밀',
     optionGroups: [
-      {
-        id: 'ice', label: '얼음 선택', required: true, multiple: false,
-        choices: [
-          { id: 'ice_full', label: '얼음 많이', priceAdd: 0 },
-          { id: 'ice_less', label: '얼음 적게', priceAdd: 0 },
-          { id: 'ice_none', label: '얼음 없이', priceAdd: 0 },
-        ],
-      },
-      {
-        id: 'size_drink', label: '사이즈', required: true, multiple: false,
-        choices: [
-          { id: 'r', label: '레귤러 (350ml)', priceAdd: 0 },
-          { id: 'l', label: '라지 (500ml)', priceAdd: 1000 },
-        ],
-      },
+      { id: 'spicy', label: '맵기 선택', required: true, multiple: false, choices: [
+        { id: 'mild', label: '순한맛', priceAdd: 0 },
+        { id: 'medium', label: '보통맛', priceAdd: 0 },
+        { id: 'hot', label: '매운맛', priceAdd: 0 },
+        { id: 'xhot', label: '아주 매운맛', priceAdd: 0 },
+      ]},
+      { id: 'add', label: '추가 선택', required: false, multiple: true, choices: [
+        { id: 'rice', label: '공기밥 추가', priceAdd: 1000 },
+        { id: 'egg', label: '계란후라이 추가', priceAdd: 500 },
+        { id: 'kimchi', label: '김치 추가', priceAdd: 500 },
+      ]},
     ],
   },
+  { id: '6', name: '돈까스', category: '일식', price: 10000, status: 'active', description: '바삭하게 튀긴 국내산 등심 돈까스. 소스, 샐러드, 공기밥 포함.', image: 'https://images.unsplash.com/photo-1734775373504-ff24ea8419b2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400', badges: ['popular'], kcal: 760, allergyInfo: '밀, 우유, 계란' },
+  { id: '7', name: '우동', category: '일식', price: 7000, status: 'soldout', description: '부드러운 면발의 따뜻한 일본식 우동.', image: 'https://images.unsplash.com/photo-1725121463846-b23056f190df?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400', badges: [], kcal: 420 },
+  { id: '8', name: '카레라이스', category: '일식', price: 8500, status: 'active', description: '부드러운 감자와 당근이 들어간 진한 일본식 카레라이스.', image: 'https://images.unsplash.com/photo-1679279726937-122c49626802?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400', badges: ['recommended'], kcal: 680 },
   {
-    id: '10', name: '티라미수', category: '디저트', price: 5500, status: 'active',
-    description: '마스카포네 치즈와 에스프레소가 어우러진 이탈리안 디저트입니다.',
-    image: 'https://images.unsplash.com/photo-1761275710704-ec6a97c0141f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-    badges: [], kcal: 340, allergyInfo: '우유, 계란, 밀',
-    timeSalePrice: 4500,
+    id: '9', name: '레몬에이드', category: '음료', price: 4500, status: 'active',
+    description: '신선한 레몬으로 만든 상큼하고 시원한 레몬에이드.',
+    image: 'https://images.unsplash.com/photo-1739138056344-3c852f4efc28?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
+    badges: [], kcal: 120,
+    optionGroups: [
+      { id: 'ice', label: '얼음 선택', required: true, multiple: false, choices: [
+        { id: 'ice_full', label: '얼음 많이', priceAdd: 0 },
+        { id: 'ice_less', label: '얼음 적게', priceAdd: 0 },
+        { id: 'ice_none', label: '얼음 없이', priceAdd: 0 },
+      ]},
+      { id: 'size_drink', label: '사이즈', required: true, multiple: false, choices: [
+        { id: 'r', label: '레귤러 (350ml)', priceAdd: 0 },
+        { id: 'l', label: '라지 (500ml)', priceAdd: 1000 },
+      ]},
+    ],
+  },
+  { id: '10', name: '티라미수', category: '디저트', price: 5500, status: 'active', description: '마스카포네 치즈와 에스프레소가 어우러진 이탈리안 디저트.', image: 'https://images.unsplash.com/photo-1761275710704-ec6a97c0141f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400', badges: [], kcal: 340, allergyInfo: '우유, 계란, 밀' },
+  {
+    id: '11', name: '돈까스 정식', category: '일식', price: 13000, status: 'active',
+    description: '바삭한 등심 돈까스에 공기밥, 된장국, 샐러드가 함께 나옵니다.',
+    image: 'https://images.unsplash.com/photo-1615361200141-f45040f367be?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
+    badges: ['recommended'],
+    optionGroups: [
+      { id: 'extra', label: '추가 선택', required: false, multiple: true, choices: [
+        { id: 'cheese', label: '치즈 추가', priceAdd: 1000 },
+        { id: 'shrimp', label: '새우튀김 추가', priceAdd: 2000 },
+        { id: 'rice2',  label: '공기밥 추가',   priceAdd: 1000 },
+        { id: 'salad',  label: '샐러드 추가',   priceAdd: 1500 },
+      ]},
+    ],
   },
 ];
 
-// ─── Badge config ─────────────────────────────────────────────────
-const BADGE_CONFIG: Record<MenuBadge, { label: string; Icon: React.ElementType; cls: string }> = {
-  popular:     { label: '인기', Icon: Flame, cls: 'bg-red-50    text-red-500    border-red-100'    },
-  recommended: { label: '추천', Icon: Star,  cls: 'bg-amber-50  text-amber-500  border-amber-100'  },
-  limited:     { label: '한정', Icon: Zap,   cls: 'bg-purple-50 text-purple-500 border-purple-100' },
-};
-
-// ─── Option key helper ─────────────────────────────────────────────
-function buildCartKey(menuId: string, opts: SelectedOptions) {
+// ─── Helpers ──────────────────────────────────────────────────────
+function buildCartKey(menuId: string, opts: SelectedOptions, mq: MultiQtyMap) {
   const flat = Object.entries(opts)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}:${[...v].sort().join(',')}`)
-    .join('|');
+    .map(([gid, cids]) => {
+      const sorted = [...cids].sort();
+      return `${gid}=${sorted.map(cid => `${cid}:${mq[`${gid}__${cid}`] ?? 1}`).join(',')}`;
+    }).join('|');
   return flat ? `${menuId}__${flat}` : menuId;
 }
 
-function buildOptionLabel(item: MenuItem, opts: SelectedOptions): string {
+function buildOptionLabel(item: MenuItem, opts: SelectedOptions, mq: MultiQtyMap): string {
   if (!item.optionGroups) return '';
   const parts: string[] = [];
   for (const group of item.optionGroups) {
     const selected = opts[group.id] ?? [];
-    const labels = selected.map(cid => group.choices.find(c => c.id === cid)?.label ?? '').filter(Boolean);
+    if (!selected.length) continue;
+    const labels = selected.map(cid => {
+      const choice = group.choices.find(c => c.id === cid);
+      if (!choice) return '';
+      if (group.multiple) {
+        const qty = mq[`${group.id}__${cid}`] ?? 1;
+        return qty > 1 ? `${choice.label} ×${qty}` : choice.label;
+      }
+      return choice.label;
+    }).filter(Boolean);
     if (labels.length) parts.push(labels.join(', '));
   }
   return parts.join(' · ');
 }
 
-function calcOptionPrice(item: MenuItem, opts: SelectedOptions): number {
+function calcOptionPrice(item: MenuItem, opts: SelectedOptions, mq: MultiQtyMap): number {
   if (!item.optionGroups) return 0;
   let extra = 0;
   for (const group of item.optionGroups) {
     const selected = opts[group.id] ?? [];
     for (const cid of selected) {
-      extra += group.choices.find(c => c.id === cid)?.priceAdd ?? 0;
+      const choice = group.choices.find(c => c.id === cid);
+      if (!choice) continue;
+      const qty = group.multiple ? (mq[`${group.id}__${cid}`] ?? 1) : 1;
+      extra += choice.priceAdd * qty;
     }
   }
   return extra;
 }
 
+function buildOptionLines(item: MenuItem, opts: SelectedOptions, mq: MultiQtyMap): OptionLine[] {
+  if (!item.optionGroups) return [];
+  const lines: OptionLine[] = [];
+  for (const group of item.optionGroups) {
+    const selected = opts[group.id] ?? [];
+    for (const cid of selected) {
+      const choice = group.choices.find(c => c.id === cid);
+      if (!choice) continue;
+      const qty = group.multiple ? (mq[`${group.id}__${cid}`] ?? 1) : 1;
+      lines.push({ label: choice.label, priceAdd: choice.priceAdd, qty });
+    }
+  }
+  return lines;
+}
+
+// ─── Badge Chip ───────────────────────────────────────────────────
+function BadgeChip({ badge }: { badge: MenuBadge }) {
+  const { label, Icon, cls } = BADGE_CFG[badge];
+  return (
+    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${cls}`}>
+      <Icon size={9} />{label}
+    </span>
+  );
+}
+
 // ─── Loading Screen ───────────────────────────────────────────────
 function LoadingScreen({ storeName, tableId }: { storeName: string; tableId: string }) {
-  const [progress, setProgress] = useState(0);
-  useEffect(() => {
-    let p = 0;
-    const interval = setInterval(() => {
-      p += Math.random() * 18 + 4;
-      if (p >= 100) { p = 100; clearInterval(interval); }
-      setProgress(p);
-    }, 120);
-    return () => clearInterval(interval);
-  }, []);
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden bg-white">
+      {/* Background blobs */}
+      <div className="absolute top-0 right-0 w-72 h-72 rounded-full pointer-events-none"
+        style={{ background: PRIMARY, opacity: 0.06, transform: 'translate(35%, -35%)' }} />
+      <div className="absolute bottom-0 left-0 w-56 h-56 rounded-full pointer-events-none"
+        style={{ background: PRIMARY, opacity: 0.04, transform: 'translate(-35%, 35%)' }} />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: 'easeOut' }}
+        className="z-10 flex flex-col items-center gap-3 w-full max-w-xs"
+      >
+        {/* Brand logo */}
+        <div className="flex items-center gap-3 mb-1">
+          {/* Orange QR icon box */}
+          <div className="w-[38px] h-[38px] rounded-[4px] flex items-center justify-center shrink-0"
+            style={{ background: PRIMARY }}>
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <path d={svgPaths.p3fa07780} stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d={svgPaths.p2f47d00}  stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d={svgPaths.p3be5c200} stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d={svgPaths.p1e1d0d80} stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d="M19.25 19.25V19.26"  stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d={svgPaths.p19925280} stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d="M2.75 11H2.76"       stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d="M11 2.75H11.01"      stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d="M11 14.6667V14.6767" stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d="M14.6667 11H15.5833" stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d="M19.25 11V11.01"     stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+              <path d="M11 19.25V18.3333"   stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.83333" />
+            </svg>
+          </div>
+          {/* Brand text */}
+          <span className="text-[24px] leading-none tracking-[0.07px]" style={{ color: PRIMARY }}>
+            <span className="font-bold">QR</span>
+            <span className="font-normal">order</span>
+          </span>
+        </div>
+
+        {/* Store name */}
+        <p className="text-[#62748e] text-[14px] leading-5">{storeName}</p>
+
+        {/* Table card — fixed square, not full-width */}
+        <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-[8px] px-8 py-3 flex flex-col items-center mt-1 shrink-0">
+          <p className="text-[#90a1b9] text-[12px] leading-4 whitespace-nowrap">테이블</p>
+          <p className="font-black text-[36px] leading-[1.1] text-[#1d293d] mt-0.5 whitespace-nowrap">{tableId}번</p>
+        </div>
+
+        {/* Loading indicator */}
+        <div className="flex items-center justify-center gap-2.5 mt-2">
+          <p className="text-[#62748e] text-[14px] leading-5">메뉴를 불러오는 중</p>
+          {/* Three staggered dots */}
+          <div className="flex items-center gap-[5px]">
+            {[0, 1, 2].map(i => (
+              <motion.span
+                key={i}
+                className="block w-[7px] h-[7px] rounded-full"
+                style={{ background: PRIMARY }}
+                animate={{ opacity: [0.3, 1, 0.3], y: [0, -4, 0] }}
+                transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.18, ease: 'easeInOut' }}
+              />
+            ))}
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Menu Item Card ───────────────────────────────────────────────
+function MenuItemCard({ item, runtimeSoldout, onAdd }: { item: MenuItem; runtimeSoldout: Set<string>; onAdd: () => void }) {
+  const isSoldout = item.status === 'soldout' || runtimeSoldout.has(item.id);
 
   return (
-    <div className="min-h-screen bg-[#FF6B2B] flex flex-col items-center justify-center px-6 overflow-hidden relative">
-      <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/4 translate-x-1/4 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-56 h-56 bg-black/10 rounded-full translate-y-1/4 -translate-x-1/4 pointer-events-none" />
-      <div className="flex flex-col items-center gap-8 z-10">
-        <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, ease: 'backOut' }} className="relative">
-          <div className="w-24 h-24 bg-white rounded-[8px] flex items-center justify-center shadow-2xl shadow-black/20">
-            <span className="text-[#FF6B2B] font-black text-3xl tracking-tighter">QR</span>
+    <div className="flex gap-3 px-4 py-3 bg-white border-b border-slate-100">
+      {/* Image — soldout overlay only, no badge overlay */}
+      <div className="relative shrink-0 w-[72px] h-[72px] rounded-[6px] overflow-hidden bg-slate-100">
+        {item.image && (
+          <img src={item.image} alt={item.name}
+            className={`w-full h-full object-cover ${isSoldout ? 'grayscale opacity-60' : ''}`} />
+        )}
+        {isSoldout && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span className="px-1.5 py-0.5 bg-black/70 text-white text-xs font-semibold rounded-[4px]">품절</span>
           </div>
-          <span className="absolute inset-0 rounded-[8px] border-4 border-white/40 animate-ping" />
-        </motion.div>
-        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2, duration: 0.5 }} className="text-center space-y-2">
-          <p className="text-white/70 text-sm">{storeName}</p>
-          <div className="bg-white/15 border border-white/25 rounded-[6px] px-8 py-3">
-            <p className="text-white/60 text-xs mb-0.5">테이블</p>
-            <p className="text-white font-black text-4xl leading-none">{tableId}번</p>
-          </div>
-        </motion.div>
-        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4, duration: 0.5 }} className="w-64 space-y-3">
-          <div className="flex items-center justify-center gap-2.5">
-            {[0, 1, 2].map(i => (
-              <motion.div key={i} className="w-2 h-2 bg-white rounded-full" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }} />
-            ))}
-            <p className="text-white/80 text-sm">메뉴를 불러오는 중...</p>
-          </div>
-          <div className="h-1 bg-white/20 rounded-full overflow-hidden">
-            <motion.div className="h-full bg-white rounded-full" style={{ width: `${progress}%` }} transition={{ duration: 0.2, ease: 'linear' }} />
-          </div>
-        </motion.div>
+        )}
       </div>
-      <p className="absolute bottom-8 text-white/30 text-xs z-10">Powered by QR Order</p>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+        <div>
+          {/* All badges in text area */}
+          {item.badges.length > 0 && (
+            <div className="flex gap-1 mb-1 flex-wrap">
+              {item.badges.map(b => <BadgeChip key={b} badge={b} />)}
+            </div>
+          )}
+          <p className="font-medium text-slate-800 text-sm leading-snug">{item.name}</p>
+          {item.description && (
+            <p className="text-slate-500 text-xs mt-0.5 leading-relaxed line-clamp-2">{item.description}</p>
+          )}
+        </div>
+
+        {/* Price + Add button */}
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="font-bold text-sm tabular-nums" style={{ color: PRIMARY }}>{item.price.toLocaleString()}원</span>
+
+          {!isSoldout && (
+            <button
+              onClick={onAdd}
+              className="h-8 w-8 flex items-center justify-center rounded-[4px] transition-colors touch-manipulation"
+              style={{ background: `${PRIMARY}18`, color: PRIMARY }}
+              onMouseEnter={e => (e.currentTarget.style.background = `${PRIMARY}28`)}
+              onMouseLeave={e => (e.currentTarget.style.background = `${PRIMARY}18`)}
+              aria-label="메뉴 추가"
+            >
+              <Plus size={16} strokeWidth={2.5} />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
 // ─── Menu Detail Sheet ────────────────────────────────────────────
 function MenuDetailSheet({
-  item,
-  onClose,
-  onAddToCart,
+  item, onClose, onAddToCart,
 }: {
   item: MenuItem;
   onClose: () => void;
-  onAddToCart: (opts: SelectedOptions, qty: number) => void;
+  onAddToCart: (opts: SelectedOptions, mq: MultiQtyMap, qty: number) => void;
 }) {
-  const hasOptions = (item.optionGroups?.length ?? 0) > 0;
-  const basePrice = item.timeSalePrice ?? item.price;
-
   const [selectedOpts, setSelectedOpts] = useState<SelectedOptions>(() => {
     const init: SelectedOptions = {};
-    item.optionGroups?.forEach(g => { init[g.id] = []; });
+    item.optionGroups?.forEach(g => {
+      init[g.id] = g.required && !g.multiple ? [g.choices[0]?.id].filter(Boolean) as string[] : [];
+    });
     return init;
   });
+  const [multiQty, setMultiQty] = useState<MultiQtyMap>({});
   const [qty, setQty] = useState(1);
 
+
   const toggleOption = (groupId: string, choiceId: string, multiple: boolean) => {
-    setSelectedOpts(prev => {
-      const cur = prev[groupId] ?? [];
-      if (multiple) {
-        return { ...prev, [groupId]: cur.includes(choiceId) ? cur.filter(c => c !== choiceId) : [...cur, choiceId] };
-      } else {
-        return { ...prev, [groupId]: cur.includes(choiceId) ? [] : [choiceId] };
+    const cur = selectedOpts[groupId] ?? [];
+    if (multiple) {
+      const isSelected = cur.includes(choiceId);
+      setSelectedOpts(prev => {
+        const prevCur = prev[groupId] ?? [];
+        const next = prevCur.includes(choiceId)
+          ? prevCur.filter(c => c !== choiceId)
+          : [...prevCur, choiceId];
+        return { ...prev, [groupId]: next };
+      });
+      if (!isSelected) {
+        setMultiQty(prev => ({ ...prev, [`${groupId}__${choiceId}`]: 1 }));
       }
+    } else {
+      setSelectedOpts(prev => {
+        const prevCur = prev[groupId] ?? [];
+        return { ...prev, [groupId]: prevCur.includes(choiceId) ? [] : [choiceId] };
+      });
+    }
+  };
+
+  const setChoiceQty = (groupId: string, choiceId: string, delta: number) => {
+    setMultiQty(prev => {
+      const key = `${groupId}__${choiceId}`;
+      return { ...prev, [key]: Math.max(1, (prev[key] ?? 1) + delta) };
     });
   };
 
@@ -305,861 +408,1469 @@ function MenuDetailSheet({
     return item.optionGroups.filter(g => g.required).every(g => (selectedOpts[g.id]?.length ?? 0) > 0);
   }, [item.optionGroups, selectedOpts]);
 
-  const optionExtra = calcOptionPrice(item, selectedOpts);
-  const unitPrice = basePrice + optionExtra;
-  const totalPrice = unitPrice * qty;
+  const optionExtra = calcOptionPrice(item, selectedOpts, multiQty);
+  const totalPrice = (item.price + optionExtra) * qty;
 
-  const handleAdd = () => {
-    if (!isRequiredSatisfied) return;
-    onAddToCart(selectedOpts, qty);
-    onClose();
+  // Swipe-down to close
+  const startY = useRef(0);
+  const handleTouchStart = (e: React.TouchEvent) => { startY.current = e.touches[0].clientY; };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.changedTouches[0].clientY - startY.current > 70) onClose();
   };
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 max-w-lg mx-auto flex flex-col justify-end">
-        {/* Backdrop */}
-        <motion.div
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/50" onClick={onClose} />
+
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 36, stiffness: 360 }}
+        className="relative bg-white rounded-tl-[12px] rounded-tr-[12px] shadow-2xl flex flex-col max-h-[92vh]"
+      >
+        {/* Handle — click or swipe down to close */}
+        <div
+          className="flex justify-center pt-3 pb-2 shrink-0 cursor-pointer touch-manipulation"
           onClick={onClose}
-        />
-
-        {/* Sheet */}
-        <motion.div
-          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-          className="relative bg-white rounded-t-[8px] shadow-2xl flex flex-col max-h-[92vh]"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
-          {/* Handle */}
-          <div className="flex justify-center pt-3 pb-0 shrink-0">
-            <div className="w-10 h-1 bg-slate-200 rounded-full" />
-          </div>
+          <div className="w-10 h-1 bg-slate-200 rounded-full" />
+        </div>
 
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 z-10 w-8 h-8 bg-black/30 backdrop-blur-sm rounded-[4px] flex items-center justify-center text-white"
-          >
-            <X size={15} />
-          </button>
-
-          {/* Scrollable body */}
-          <div className="overflow-y-auto flex-1">
-            {/* Hero image */}
-            {item.image && (
-              <div className="relative w-full h-52 shrink-0 overflow-hidden">
-                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+        {/* Scrollable body — subtle-box for minimal scrollbar */}
+        <div className="subtle-box flex-1 overscroll-contain">
+          {/* Hero image */}
+          <div className="w-full aspect-video bg-slate-100 overflow-hidden shrink-0">
+            {item.image ? (
+              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Package size={40} className="text-slate-300" />
               </div>
             )}
+          </div>
 
-            <div className="px-5 pt-4 pb-2 space-y-4">
-              {/* Header */}
-              <div>
-                {/* Badges */}
-                {item.badges.length > 0 && (
-                  <div className="flex gap-1 mb-2 flex-wrap">
-                    {item.badges.map(badge => {
-                      const { label, Icon, cls } = BADGE_CONFIG[badge];
-                      return (
-                        <span key={badge} className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-[3px] border ${cls}`}>
-                          <Icon size={9} />{label}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-                <h2 className="font-black text-slate-800 text-xl">{item.name}</h2>
-                <p className="text-slate-500 text-sm mt-1.5 leading-relaxed">{item.description}</p>
-
-                {/* Meta info */}
-                <div className="flex items-center gap-3 mt-3">
-                  {item.kcal && (
-                    <span className="flex items-center gap-1 text-[11px] text-slate-400">
-                      <Flame size={11} className="text-orange-300" />
-                      {item.kcal}kcal
-                    </span>
-                  )}
-                  {item.allergyInfo && (
-                    <span className="flex items-center gap-1 text-[11px] text-slate-400">
-                      <AlertTriangle size={10} className="text-amber-400" />
-                      알레르기: {item.allergyInfo}
-                    </span>
-                  )}
+          <div className="px-4 pt-4 pb-2 space-y-4">
+            {/* Name + badges + price */}
+            <div>
+              {item.badges.length > 0 && (
+                <div className="flex gap-1 flex-wrap mb-2">
+                  {item.badges.map(b => <BadgeChip key={b} badge={b} />)}
                 </div>
-
-                {/* Price */}
-                <div className="mt-3 flex items-baseline gap-2">
-                  {item.timeSalePrice ? (
-                    <>
-                      <span className="font-black text-[#FF6B2B] text-2xl">{item.timeSalePrice.toLocaleString()}원</span>
-                      <span className="line-through text-slate-300 text-sm">{item.price.toLocaleString()}원</span>
-                      <span className="text-xs font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-[3px]">
-                        {Math.round((1 - item.timeSalePrice / item.price) * 100)}% 할인
-                      </span>
-                    </>
-                  ) : (
-                    <span className="font-black text-slate-800 text-2xl">{item.price.toLocaleString()}원</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Divider */}
-              {hasOptions && <div className="border-t border-slate-100" />}
-
-              {/* Option Groups */}
-              {item.optionGroups?.map((group) => (
-                <div key={group.id} className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-800 text-sm">{group.label}</span>
-                      {group.multiple && (
-                        <span className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded-[3px]">중복 선택 가능</span>
-                      )}
-                    </div>
-                    {group.required ? (
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[3px] ${
-                        (selectedOpts[group.id]?.length ?? 0) > 0
-                          ? 'bg-green-50 text-green-600 border border-green-100'
-                          : 'bg-[#FF6B2B]/10 text-[#FF6B2B] border border-[#FF6B2B]/20'
-                      }`}>
-                        {(selectedOpts[group.id]?.length ?? 0) > 0 ? '선택 완료 ✓' : '필수'}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded-[3px]">선택</span>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    {group.choices.map(choice => {
-                      const isSelected = (selectedOpts[group.id] ?? []).includes(choice.id);
-                      return (
-                        <button
-                          key={choice.id}
-                          onClick={() => toggleOption(group.id, choice.id, group.multiple)}
-                          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-[4px] border transition-all text-left ${
-                            isSelected
-                              ? 'bg-[#FF6B2B]/6 border-[#FF6B2B] text-[#FF6B2B]'
-                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            {/* Indicator */}
-                            <div className={`shrink-0 flex items-center justify-center transition-all ${
-                              group.multiple
-                                ? `w-4 h-4 rounded-[3px] border ${isSelected ? 'bg-[#FF6B2B] border-[#FF6B2B]' : 'border-slate-300'}`
-                                : `w-4 h-4 rounded-full border-2 ${isSelected ? 'border-[#FF6B2B]' : 'border-slate-300'}`
-                            }`}>
-                              {isSelected && group.multiple && <Check size={10} className="text-white" strokeWidth={3} />}
-                              {isSelected && !group.multiple && <div className="w-2 h-2 rounded-full bg-[#FF6B2B]" />}
-                            </div>
-                            <span className="text-sm font-medium">{choice.label}</span>
-                          </div>
-                          {choice.priceAdd > 0 && (
-                            <span className={`text-sm font-semibold ${isSelected ? 'text-[#FF6B2B]' : 'text-slate-500'}`}>
-                              +{choice.priceAdd.toLocaleString()}원
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-
-              {/* Quantity */}
-              <div className="border-t border-slate-100 pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 text-sm">수량</span>
-                  <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-[4px] px-2 py-1.5">
-                    <button
-                      onClick={() => setQty(q => Math.max(1, q - 1))}
-                      disabled={qty <= 1}
-                      className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-slate-800 disabled:opacity-30 transition-opacity"
-                    >
-                      <Minus size={14} />
-                    </button>
-                    <span className="w-6 text-center font-black text-slate-800 tabular-nums">{qty}</span>
-                    <button
-                      onClick={() => setQty(q => q + 1)}
-                      className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"
-                    >
-                      <Plus size={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom padding for fixed footer */}
-              <div className="h-2" />
+              )}
+              <p className="font-semibold text-slate-800 text-base leading-snug">{item.name}</p>
+              <p className="font-bold text-base mt-1" style={{ color: PRIMARY }}>{item.price.toLocaleString()}원</p>
+              {item.description && (
+                <p className="text-slate-500 text-sm mt-2 leading-relaxed">{item.description}</p>
+              )}
             </div>
-          </div>
 
-          {/* Fixed footer */}
-          <div className="px-5 pb-8 pt-3 border-t border-slate-100 bg-white shrink-0">
-            {!isRequiredSatisfied && (
-              <p className="text-xs text-[#FF6B2B] flex items-center gap-1 mb-2">
-                <AlertTriangle size={11} />
-                필수 옵션을 선택해 주세요
-              </p>
-            )}
-            <button
-              onClick={handleAdd}
-              disabled={!isRequiredSatisfied}
-              className="w-full h-11 bg-[#FF6B2B] text-white rounded-[4px] font-bold flex items-center justify-between px-4 shadow-md shadow-[#FF6B2B]/20 hover:bg-[#E85D20] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-            >
-              <span>장바구니에 담기</span>
-              <span className="font-black tabular-nums">{totalPrice.toLocaleString()}원</span>
-            </button>
+            {/* Option Groups */}
+            {item.optionGroups?.map(group => (
+              <div key={group.id}>
+                <div className="h-px bg-slate-100 mb-3" />
+                {/* Group header */}
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-slate-700 text-sm font-medium">{group.label}</span>
+                  <div className="flex items-center gap-1.5">
+                    {group.multiple && (
+                      <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-[3px]">복수선택</span>
+                    )}
+                    {/* 필수/선택 — always static, no completion state */}
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-[3px] ${
+                      group.required ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {group.required ? '필수' : '선택'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Choices */}
+                <div className="space-y-2">
+                  {group.choices.map(choice => {
+                    const isSelected = (selectedOpts[group.id] ?? []).includes(choice.id);
+                    const choiceQty = multiQty[`${group.id}__${choice.id}`] ?? 1;
+                    return (
+                      <div key={choice.id}
+                        className={`flex items-center h-11 px-3 gap-2 rounded-[6px] border transition-colors ${
+                          isSelected ? 'border-orange-300 bg-orange-50/40' : 'border-slate-200 bg-white'
+                        }`}
+                      >
+                        {/* Indicator + label — fills space */}
+                        <button
+                          onClick={() => toggleOption(group.id, choice.id, group.multiple)}
+                          className="flex items-center gap-2.5 flex-1 min-w-0 h-full touch-manipulation"
+                        >
+                          {group.multiple ? (
+                            <div className={`shrink-0 w-4 h-4 rounded-[3px] border-2 flex items-center justify-center transition-colors ${
+                              isSelected ? 'border-orange-500 bg-[#FF6B2B]' : 'border-slate-300'
+                            }`}>
+                              {isSelected && <Check size={10} className="text-white" strokeWidth={3} />}
+                            </div>
+                          ) : (
+                            <div className={`shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                              isSelected ? 'border-orange-500' : 'border-slate-300'
+                            }`}>
+                              {isSelected && <div className="w-2 h-2 rounded-full" style={{ background: PRIMARY }} />}
+                            </div>
+                          )}
+                          <span className={`text-sm truncate ${isSelected ? 'text-slate-800 font-medium' : 'text-slate-700'}`}>
+                            {choice.label}
+                          </span>
+                        </button>
+
+                        {/* Right side: qty (if multi + selected) then price */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {group.multiple && isSelected && (
+                            <div className="flex items-center gap-[2px] rounded-[4px] px-1" style={{ background: 'rgba(255,107,43,0.09)' }}>
+                              <button onClick={() => setChoiceQty(group.id, choice.id, -1)}
+                                className="w-6 h-8 flex items-center justify-center active:opacity-60 touch-manipulation"
+                                style={{ color: PRIMARY }}>
+                                <Minus size={10} strokeWidth={2.5} />
+                              </button>
+                              <span className="font-medium text-xs w-5 text-center tabular-nums" style={{ color: '#314158' }}>{choiceQty}</span>
+                              <button onClick={() => setChoiceQty(group.id, choice.id, 1)}
+                                className="w-6 h-8 flex items-center justify-center active:opacity-60 touch-manipulation"
+                                style={{ color: PRIMARY }}>
+                                <Plus size={10} strokeWidth={2.5} />
+                              </button>
+                            </div>
+                          )}
+                          <span className="text-xs text-slate-400 whitespace-nowrap w-12 text-right">
+                            {choice.priceAdd > 0 ? `+${choice.priceAdd.toLocaleString()}원` : '기본'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {/* Qty */}
+            <div>
+              <div className="h-px bg-slate-100 mb-3" />
+              <div className="flex items-center justify-between">
+                <span className="text-slate-700 text-sm font-medium">수량</span>
+                <div className="flex items-center gap-1 bg-slate-100 rounded-[6px] p-1">
+                  <button onClick={() => setQty(q => Math.max(1, q - 1))} disabled={qty <= 1}
+                    className="w-8 h-8 flex items-center justify-center rounded-[4px] text-slate-600 bg-white shadow-sm disabled:opacity-30 touch-manipulation">
+                    <Minus size={13} strokeWidth={2.5} />
+                  </button>
+                  <span className="text-slate-800 font-semibold text-sm w-8 text-center tabular-nums">{qty}</span>
+                  <button onClick={() => setQty(q => q + 1)}
+                    className="w-8 h-8 flex items-center justify-center rounded-[4px] text-slate-600 bg-white shadow-sm touch-manipulation">
+                    <Plus size={13} strokeWidth={2.5} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="h-1" />
           </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+        </div>
+
+        {/* Fixed footer */}
+        <div className="px-4 pb-8 pt-3 border-t border-slate-100 bg-white shrink-0">
+          {!isRequiredSatisfied && (
+            <p className="text-xs text-red-500 flex items-center gap-1 mb-2">
+              <AlertTriangle size={11} />필수 옵션을 선택해 주세요
+            </p>
+          )}
+          <button
+            onClick={() => { if (!isRequiredSatisfied) return; onAddToCart(selectedOpts, multiQty, qty); onClose(); }}
+            disabled={!isRequiredSatisfied}
+            className="w-full h-12 text-white rounded-[6px] font-semibold text-base flex items-center justify-between px-4 disabled:opacity-40 active:brightness-90 transition-all touch-manipulation"
+            style={{ background: isRequiredSatisfied ? PRIMARY : '#94a3b8' }}
+          >
+            <span>장바구니에 담기</span>
+            <span className="font-bold tabular-nums">{totalPrice.toLocaleString()}원</span>
+          </button>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
-// ─── Menu Item Card ───────────────────────────────────────────────
-function MenuItemCard({
-  item, qty, onAdd, onRemove, onOpenDetail,
+// ─── Cart Sheet ───────────────────────────────────────────────────
+function CartSheet({
+  cart, onAdd, onRemove, onDelete, onClose, onOrder, soldoutMenuIds, soldoutActive,
 }: {
-  item: MenuItem;
-  qty: number;
-  onAdd: () => void;
-  onRemove: () => void;
-  onOpenDetail: () => void;
+  cart: CartItem[]; onAdd: (k: string) => void;
+  onRemove: (k: string) => void; onDelete: (k: string) => void;
+  onClose: () => void; onOrder: () => void;
+  soldoutMenuIds: Set<string>; soldoutActive: boolean;
 }) {
-  const isSoldout = item.status === 'soldout';
-  const hasOptions = (item.optionGroups?.length ?? 0) > 0;
-  const salePrice = item.timeSalePrice;
-  const discountPct = salePrice ? Math.round((1 - salePrice / item.price) * 100) : 0;
+  const totalQty = cart.reduce((s, i) => s + i.qty, 0);
+  const hasSoldout = soldoutActive && cart.some(ci => soldoutMenuIds.has(ci.menuId));
+  const totalPrice = cart.reduce((s, i) => s + (i.price + i.optionPrice) * i.qty, 0);
+
+  const startY = useRef(0);
+  const handleTouchStart = (e: React.TouchEvent) => { startY.current = e.touches[0].clientY; };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.changedTouches[0].clientY - startY.current > 70) onClose();
+  };
 
   return (
-    <motion.div
-      layout
-      className={`bg-white rounded-[6px] border overflow-hidden ${
-        isSoldout ? 'border-slate-100 opacity-60' : 'border-slate-200 shadow-sm'
-      }`}
-    >
-      <div className="flex">
-        {/* Image */}
-        <div className="relative w-[100px] h-[100px] shrink-0 overflow-hidden">
-          {item.image ? (
-            <img src={item.image} alt={item.name} className={`w-full h-full object-cover ${isSoldout ? 'grayscale' : ''}`} />
+    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 36, stiffness: 360 }}
+        className="relative bg-white rounded-tl-[12px] rounded-tr-[12px] shadow-2xl flex flex-col max-h-[82vh]"
+      >
+        {/* Handle — tap or swipe to close */}
+        <div
+          className="flex justify-center pt-3 pb-2 shrink-0 cursor-pointer touch-manipulation"
+          onClick={onClose} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
+        >
+          <div className="w-10 h-1 bg-slate-200 rounded-full" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center px-4 py-2.5 border-b border-slate-100 shrink-0">
+          <ShoppingCart size={16} className="text-slate-600 shrink-0" />
+          <span className="font-semibold text-slate-800 text-sm ml-2">장바구니</span>
+          <span
+            className="text-white text-xs font-semibold px-1.5 py-0.5 rounded-[3px] min-w-[20px] text-center tabular-nums ml-2"
+            style={{ background: PRIMARY }}
+          >
+            {totalQty}
+          </span>
+        </div>
+
+        {/* Content */}
+        <div className="subtle-box flex-1 px-4">
+          {cart.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <ShoppingCart size={36} className="text-slate-200" />
+              <p className="text-slate-400 text-sm">장바구니에 담긴 메뉴가 없습니다.</p>
+            </div>
           ) : (
-            <div className="w-full h-full bg-slate-100 flex items-center justify-center">
-              <Package size={24} className="text-slate-300" />
+            <div>
+              {cart.map(item => {
+                const isSoldout = soldoutActive && soldoutMenuIds.has(item.menuId);
+                const unitPrice = item.price + item.optionPrice;
+                const rowTotal = unitPrice * item.qty;
+                return (
+                  <div key={item.cartKey} className="py-3 border-b border-slate-100 last:border-0">
+                    {/* Name + row total / delete button */}
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={`font-semibold text-sm leading-snug flex-1 min-w-0 ${isSoldout ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                        {item.name}
+                      </p>
+                      {isSoldout ? (
+                        /* Soldout: only X delete button */
+                        <button
+                          onClick={() => onDelete(item.cartKey)}
+                          className="w-[21px] h-[21px] rounded-[2px] flex items-center justify-center text-white shrink-0 touch-manipulation"
+                          style={{ background: '#d72b2b' }}
+                          aria-label="삭제"
+                        >
+                          <X size={11} strokeWidth={2.5} />
+                        </button>
+                      ) : (
+                        <p className="font-bold text-sm tabular-nums shrink-0" style={{ color: PRIMARY }}>
+                          {rowTotal.toLocaleString()}원
+                        </p>
+                      )}
+                    </div>
+                    {/* Option lines */}
+                    {item.optionLines && item.optionLines.length > 0 && (
+                      <div className="mt-0.5 flex flex-col gap-[1px]">
+                        {item.optionLines.map((line, i) => (
+                          <p key={i} className={`text-xs leading-snug ${isSoldout ? 'line-through text-slate-300' : 'text-slate-400'}`}>
+                            {line.label}
+                            {line.priceAdd > 0 && (
+                              <span className="tabular-nums"> (+{line.priceAdd.toLocaleString()}원)</span>
+                            )}
+                            {line.qty > 1 && (
+                              <span className="tabular-nums"> ×{line.qty}</span>
+                            )}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {isSoldout ? (
+                      /* Soldout row: red notice + price (no qty controls) */
+                      <div className="flex items-center justify-between mt-1.5">
+                        <p className="text-[10px] font-medium" style={{ color: '#d72b2b' }}>현재 품절된 메뉴입니다</p>
+                        <p className="text-xs text-slate-400 tabular-nums line-through">{item.price.toLocaleString()}원</p>
+                      </div>
+                    ) : (
+                      /* Normal row: unit price + qty controls */
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-slate-400 text-xs tabular-nums">{item.price.toLocaleString()}원</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => onRemove(item.cartKey)}
+                            className={`w-7 h-7 rounded-[4px] flex items-center justify-center transition-colors touch-manipulation ${
+                              item.qty === 1 ? 'text-white' : 'bg-slate-100 text-slate-500'
+                            }`}
+                            style={item.qty === 1 ? { background: '#d72b2b' } : {}}
+                            aria-label={item.qty === 1 ? '삭제' : '수량 감소'}
+                          >
+                            {item.qty === 1 ? <X size={11} strokeWidth={2.5} /> : <Minus size={11} strokeWidth={2.5} />}
+                          </button>
+                          <span className="text-slate-800 font-semibold text-sm w-6 text-center tabular-nums">{item.qty}</span>
+                          <button
+                            onClick={() => onAdd(item.cartKey)}
+                            className="w-7 h-7 bg-slate-100 rounded-[4px] flex items-center justify-center text-slate-600 touch-manipulation"
+                            aria-label="수량 증가"
+                          >
+                            <Plus size={11} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
-          {isSoldout && (
-            <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
-              <span className="bg-white/90 text-slate-700 text-xs font-bold px-2 py-0.5 rounded-[3px]">품절</span>
-            </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 pb-8 pt-3 border-t border-slate-100 space-y-3 shrink-0">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 text-sm font-medium">총 결제 금액</span>
+            <span className="font-bold text-lg tabular-nums" style={{ color: PRIMARY }}>{totalPrice.toLocaleString()}원</span>
+          </div>
+          {cart.length === 0 ? (
+            <button
+              onClick={onClose}
+              className="w-full h-12 text-white rounded-[6px] font-semibold text-base flex items-center justify-center active:brightness-90 transition-all touch-manipulation"
+              style={{ background: PRIMARY }}
+            >
+              메뉴 보러가기
+            </button>
+          ) : (
+            <button
+              onClick={onOrder}
+              disabled={hasSoldout}
+              className="w-full h-12 text-white rounded-[6px] font-semibold text-base flex items-center justify-center transition-all touch-manipulation"
+              style={{ background: hasSoldout ? '#c1c7cd' : PRIMARY }}
+              onMouseEnter={e => { if (!hasSoldout) e.currentTarget.style.background = '#E85D20'; }}
+              onMouseLeave={e => { if (!hasSoldout) e.currentTarget.style.background = PRIMARY; }}
+            >
+              주문하기
+            </button>
           )}
-          {salePrice && !isSoldout && (
-            <div className="absolute top-1.5 left-1.5">
-              <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-[3px] leading-none">
-                -{discountPct}%
-              </span>
-            </div>
-          )}
-          {/* Option indicator */}
-          {hasOptions && !isSoldout && (
-            <div className="absolute bottom-1.5 left-1.5">
-              <span className="bg-black/50 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-[3px] leading-none flex items-center gap-0.5">
-                <ChevronDown size={8} />옵션
-              </span>
-            </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Order History Sheet ──────────────────────────────────────────
+function OrderHistorySheet({
+  orders, cart, onClose,
+}: {
+  orders: OrderRecord[]; cart: CartItem[]; onClose: () => void;
+}) {
+  const allItems = [...orders.flatMap(o => o.items), ...cart];
+  const totalQty = allItems.reduce((s, i) => s + i.qty, 0);
+  const total = allItems.reduce((s, i) => s + (i.price + i.optionPrice) * i.qty, 0);
+
+  const startY = useRef(0);
+  const handleTouchStart = (e: React.TouchEvent) => { startY.current = e.touches[0].clientY; };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.changedTouches[0].clientY - startY.current > 70) onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 36, stiffness: 360 }}
+        className="relative bg-white rounded-tl-[12px] rounded-tr-[12px] shadow-2xl flex flex-col max-h-[85vh]"
+      >
+        {/* Handle — tap or swipe to close */}
+        <div
+          className="flex justify-center pt-3 pb-2 shrink-0 cursor-pointer touch-manipulation"
+          onClick={onClose} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
+        >
+          <div className="w-10 h-1 bg-slate-200 rounded-full" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center px-4 py-2.5 border-b border-slate-100 shrink-0">
+          <Receipt size={16} className="text-slate-600 shrink-0" />
+          <span className="font-semibold text-slate-800 text-sm ml-2">주문내역</span>
+          {totalQty > 0 && (
+            <span className="text-white text-xs font-semibold px-1.5 py-0.5 rounded-[3px] min-w-[20px] text-center tabular-nums ml-2"
+              style={{ background: PRIMARY }}>
+              {totalQty}
+            </span>
           )}
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
-          <div>
-            {item.badges.length > 0 && (
-              <div className="flex gap-1 mb-1.5 flex-wrap">
-                {item.badges.map(badge => {
-                  const { label, Icon, cls } = BADGE_CONFIG[badge];
-                  return (
-                    <span key={badge} className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-[3px] border ${cls}`}>
-                      <Icon size={9} />{label}
-                    </span>
-                  );
-                })}
-                {item.limitedQty !== undefined && (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-[3px] border bg-orange-50 text-orange-500 border-orange-100">
-                    <AlertTriangle size={9} />잔여 {item.limitedQty}개
-                  </span>
-                )}
-              </div>
-            )}
-            <p className="font-semibold text-slate-800 text-sm leading-snug">{item.name}</p>
-            <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">{item.description}</p>
-          </div>
-
-          {/* Price + Controls */}
-          <div className="flex items-center justify-between mt-2.5">
-            <div className="min-w-0">
-              {salePrice ? (
-                <div>
-                  <span className="line-through text-slate-300 text-xs block">{item.price.toLocaleString()}원</span>
-                  <span className="font-black text-[#FF6B2B] text-base leading-tight">{salePrice.toLocaleString()}원</span>
-                </div>
-              ) : (
-                <span className={`font-bold text-sm ${isSoldout ? 'text-slate-400' : 'text-slate-800'}`}>
-                  {item.price.toLocaleString()}원
-                </span>
-              )}
+        <div className="subtle-box flex-1 px-4">
+          {allItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <Receipt size={36} className="text-slate-200" />
+              <p className="text-slate-400 text-sm">주문내역이 없습니다</p>
             </div>
-
-            {!isSoldout && (
-              <div className="flex items-center gap-1.5">
-                {/* Detail button — always visible */}
-                <button
-                  onClick={onOpenDetail}
-                  className="w-8 h-8 border border-slate-200 rounded-[4px] flex items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-300 hover:bg-slate-50 active:opacity-70 transition-all"
-                  title="메뉴 상세 보기"
-                >
-                  <Info size={14} />
-                </button>
-
-                {/* Add/qty button */}
-                {qty > 0 ? (
-                  <div className="flex items-center gap-1.5 bg-[#FF6B2B]/10 rounded-[4px] px-2 py-1.5">
-                    <button
-                      onClick={onRemove}
-                      className="w-6 h-6 bg-[#FF6B2B] rounded-[3px] flex items-center justify-center text-white shrink-0 active:opacity-70 transition-opacity"
-                    >
-                      <Minus size={11} strokeWidth={3} />
-                    </button>
-                    <span className="text-[#FF6B2B] font-black text-sm w-5 text-center tabular-nums">{qty}</span>
-                    <button
-                      onClick={onAdd}
-                      className="w-6 h-6 bg-[#FF6B2B] rounded-[3px] flex items-center justify-center text-white shrink-0 active:opacity-70 transition-opacity"
-                    >
-                      <Plus size={11} strokeWidth={3} />
-                    </button>
+          ) : (
+            <div>
+              {allItems.map((item, idx) => {
+                const unitPrice = item.price + item.optionPrice;
+                const rowTotal = unitPrice * item.qty;
+                return (
+                  <div key={`${item.cartKey}-${idx}`}
+                    className="flex items-start gap-3 py-3 border-b border-slate-100 last:border-0">
+                    {/* Name + option */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-800 text-xs leading-snug">{item.name}</p>
+                      {item.optionLines && item.optionLines.length > 0 && (
+                        <div className="mt-0.5 flex flex-col gap-[1px]">
+                          {item.optionLines.map((line, i) => (
+                            <p key={i} className="text-slate-400 text-[10px] leading-snug">
+                              {line.label}
+                              {line.priceAdd > 0 && (
+                                <span className="tabular-nums"> (+{line.priceAdd.toLocaleString()}원)</span>
+                              )}
+                              {line.qty > 1 && (
+                                <span className="tabular-nums"> ×{line.qty}</span>
+                              )}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-slate-400 text-[10px] mt-0.5 tabular-nums">
+                        {item.price.toLocaleString()}원
+                      </p>
+                    </div>
+                    {/* Qty */}
+                    <span className="text-slate-600 text-xs font-medium tabular-nums shrink-0 pt-0.5">
+                      {item.qty}
+                    </span>
+                    {/* Row total */}
+                    <span className="font-bold text-xs tabular-nums shrink-0 pt-0.5 w-16 text-right" style={{ color: PRIMARY }}>
+                      {rowTotal.toLocaleString()}원
+                    </span>
                   </div>
-                ) : (
-                  <button
-                    onClick={onAdd}
-                    className="w-8 h-8 bg-[#FF6B2B] rounded-[4px] flex items-center justify-center text-white hover:bg-[#E85D20] active:opacity-70 transition-all"
-                  >
-                    <Plus size={15} strokeWidth={2.5} />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
+
+        {/* Footer */}
+        <div className="px-4 pb-8 pt-3 border-t border-slate-100 space-y-3 shrink-0">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-500 text-sm font-medium">총 결제 금액</span>
+            <div className="flex items-center gap-3">
+              {totalQty > 0 && (
+                <span className="text-slate-500 text-sm tabular-nums">{totalQty}개</span>
+              )}
+              <span className="font-bold text-lg tabular-nums" style={{ color: PRIMARY }}>
+                {total.toLocaleString()}원
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-full h-12 text-white rounded-[6px] font-semibold text-base flex items-center justify-center active:brightness-90 transition-all touch-manipulation"
+            style={{ background: PRIMARY }}
+          >
+            확인
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Order Processing Overlay ────────────────────────────────────
+function OrderProcessingOverlay() {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[70] bg-white flex flex-col items-center justify-center px-8 text-center"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-[0.05]"
+          style={{ background: PRIMARY, transform: 'translate(35%,-35%)' }} />
+        <div className="absolute bottom-0 left-0 w-56 h-56 rounded-full opacity-[0.04]"
+          style={{ background: PRIMARY, transform: 'translate(-35%,35%)' }} />
       </div>
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.3 }}
+        className="flex flex-col items-center gap-4 z-10"
+      >
+        <div className="w-16 h-16 rounded-full flex items-center justify-center"
+          style={{ background: `${PRIMARY}12` }}>
+          <Loader2 size={28} className="animate-spin" style={{ color: PRIMARY }} />
+        </div>
+        <div>
+          <p className="font-semibold text-[18px] text-[#222]">주문 처리중</p>
+          <p className="text-[14px] text-[#999] mt-1.5">잠시만 기다려주세요, 주문 접수가 진행 중입니다.</p>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }
 
-// ─── Cart Drawer ──────────────────────────────────────────────────
-function CartDrawer({
-  cart, onAdd, onRemove, onClose, onOrder,
+// ─── Order Error Screen ───────────────────────────────────────────
+function OrderErrorScreen({
+  type, duplicateTime, onGoMain, onRetry, onHistory,
 }: {
-  cart: CartItem[];
-  onAdd: (cartKey: string) => void;
-  onRemove: (cartKey: string) => void;
-  onClose: () => void;
-  onOrder: () => void;
+  type: 'network' | 'duplicate';
+  duplicateTime?: string;
+  onGoMain: () => void;
+  onRetry?: () => void;
+  onHistory?: () => void;
 }) {
-  const totalItems = cart.reduce((s, i) => s + i.qty, 0);
-  const totalPrice = cart.reduce((s, i) => s + (i.price + i.optionPrice) * i.qty, 0);
-
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 max-w-lg mx-auto flex flex-col justify-end">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <motion.div
-          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="relative bg-white rounded-t-[8px] shadow-2xl flex flex-col max-h-[80vh]"
-        >
-          <div className="flex justify-center pt-3 pb-1 shrink-0">
-            <div className="w-10 h-1 bg-slate-200 rounded-full" />
-          </div>
-          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
-            <div className="flex items-center gap-2">
-              <ShoppingCart size={17} className="text-slate-700" />
-              <h2 className="font-bold text-slate-800">장바구니</h2>
-              <span className="bg-[#FF6B2B] text-white text-xs font-bold px-2 py-0.5 rounded-[3px] min-w-[22px] text-center tabular-nums">{totalItems}</span>
-            </div>
-            <button onClick={onClose} className="w-7 h-7 bg-slate-100 rounded-[4px] flex items-center justify-center text-slate-500 hover:bg-slate-200 active:opacity-70 transition-all">
-              <X size={14} />
-            </button>
-          </div>
-
-          <div className="overflow-y-auto flex-1 px-5 py-2">
-            {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <ShoppingCart size={36} className="text-slate-200 mb-3" />
-                <p className="text-slate-400 text-sm">담은 메뉴가 없습니다</p>
-              </div>
-            ) : (
-              <div className="space-y-0">
-                {cart.map(item => (
-                  <div key={item.cartKey} className="flex items-start gap-3 py-3 border-b border-slate-50 last:border-0">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-800 text-sm leading-snug">{item.name}</p>
-                      {item.optionLabel && (
-                        <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{item.optionLabel}</p>
-                      )}
-                      <p className="text-[#FF6B2B] font-bold text-sm mt-0.5">
-                        {(item.price + item.optionPrice).toLocaleString()}원
-                        {item.optionPrice > 0 && (
-                          <span className="text-slate-400 font-normal text-xs ml-1">(옵션 +{item.optionPrice.toLocaleString()}원)</span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => onRemove(item.cartKey)} className="w-7 h-7 border border-slate-200 rounded-[4px] flex items-center justify-center text-slate-500 hover:bg-slate-50 active:bg-slate-100 transition-colors">
-                        <Minus size={12} />
-                      </button>
-                      <span className="w-6 text-center font-bold text-slate-800 text-sm tabular-nums">{item.qty}</span>
-                      <button onClick={() => onAdd(item.cartKey)} className="w-7 h-7 bg-[#FF6B2B] rounded-[4px] flex items-center justify-center text-white active:opacity-70 transition-opacity">
-                        <Plus size={12} />
-                      </button>
-                    </div>
-                    <span className="text-slate-700 font-semibold text-sm w-20 text-right tabular-nums shrink-0">
-                      {((item.price + item.optionPrice) * item.qty).toLocaleString()}원
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="px-5 pb-8 pt-4 border-t border-slate-100 space-y-3 shrink-0">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium text-sm">총 결제금액</span>
-              <span className="text-xl font-black text-slate-900 tabular-nums">{totalPrice.toLocaleString()}원</span>
-            </div>
-            <button
-              onClick={onOrder}
-              disabled={cart.length === 0}
-              className="w-full h-11 bg-[#FF6B2B] text-white rounded-[4px] font-bold flex items-center justify-center gap-2 shadow-md shadow-[#FF6B2B]/20 hover:bg-[#E85D20] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-            >
-              <span>주문하기</span>
-              <span className="opacity-70">·</span>
-              <span className="tabular-nums">{totalPrice.toLocaleString()}원</span>
-            </button>
-          </div>
-        </motion.div>
+    <motion.div
+      className="fixed inset-0 z-[70] bg-white flex flex-col items-center justify-center px-8 text-center"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+    >
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-[0.05]"
+          style={{ background: PRIMARY, transform: 'translate(35%,-35%)' }} />
+        <div className="absolute bottom-0 left-0 w-56 h-56 rounded-full opacity-[0.04]"
+          style={{ background: PRIMARY, transform: 'translate(-35%,35%)' }} />
       </div>
-    </AnimatePresence>
+
+      <motion.div
+        initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.35 }}
+        className="flex flex-col items-center gap-5 w-full max-w-xs z-10"
+      >
+        {/* Icon */}
+        <div className="w-16 h-16 rounded-full flex items-center justify-center"
+          style={{ background: `${PRIMARY}12` }}>
+          <AlertTriangle size={28} style={{ color: PRIMARY }} />
+        </div>
+
+        {/* Text */}
+        <div>
+          {type === 'network' ? (
+            <>
+              <p className="font-semibold text-[18px] text-[#222] leading-snug">주문 연결이 원활하지 않습니다.</p>
+              <p className="text-[14px] text-[#999] mt-2 leading-relaxed">
+                아래 버튼을 눌러 다시 시도하거나,<br />메인으로 이동해 다시 주문해 주세요.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-[18px] text-[#222] leading-snug whitespace-pre-line">
+                {'이미 같은 테이블에서\n주문이 접수되었습니다'}
+              </p>
+              <p className="text-[14px] text-[#999] mt-2 leading-relaxed">
+                동일한 테이블에서 선주문이 완료되어 취소되었습니다.<br />주문 내역을 확인해 주세요.
+              </p>
+              {duplicateTime && (
+                <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full text-xs font-medium"
+                  style={{ background: `${PRIMARY}12`, color: PRIMARY }}>
+                  <Clock size={11} />
+                  {duplicateTime} 접수 완료
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Buttons */}
+        <div className="flex flex-col gap-2.5 w-full mt-1">
+          {/* primary-outline: border 1px + orange text, transparent bg */}
+          <button
+            onClick={onGoMain}
+            className="w-full h-12 rounded-[6px] font-semibold text-sm border touch-manipulation transition-colors"
+            style={{ borderColor: PRIMARY, color: PRIMARY }}
+            onMouseEnter={e => (e.currentTarget.style.background = `${PRIMARY}0d`)}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            메인화면으로 이동
+          </button>
+          {/* primary: filled orange */}
+          {type === 'network' ? (
+            <button
+              onClick={onRetry}
+              className="w-full h-12 text-white rounded-[6px] font-semibold text-sm touch-manipulation transition-colors"
+              style={{ background: PRIMARY }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#E85D20')}
+              onMouseLeave={e => (e.currentTarget.style.background = PRIMARY)}
+            >
+              다시 시도하기
+            </button>
+          ) : (
+            <button
+              onClick={onHistory}
+              className="w-full h-12 text-white rounded-[6px] font-semibold text-sm touch-manipulation transition-colors"
+              style={{ background: PRIMARY }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#E85D20')}
+              onMouseLeave={e => (e.currentTarget.style.background = PRIMARY)}
+            >
+              주문내역 확인하기
+            </button>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── Soldout Alert Modal ──────────────────────────────────────────
+function SoldoutModal({ items, onClose }: { items: CartItem[]; onClose: () => void }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[75] flex items-center justify-center px-8"
+      style={{ background: 'rgba(0,0,0,0.45)' }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="bg-white rounded-[12px] w-full max-w-[280px] px-6 py-6 shadow-2xl"
+        initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+      >
+        <p className="font-semibold text-[15px] text-[#222] leading-snug text-center mb-1">
+          주문할 수 없는 메뉴가 있습니다
+        </p>
+        <p className="text-[13px] text-[#999] text-center mb-4">
+          품절된 메뉴를 확인해 주세요.
+        </p>
+
+        {items.length > 0 && (
+          <div className="mb-4 bg-slate-50 rounded-[8px] px-3 py-2.5 space-y-1.5">
+            {items.map(item => (
+              <div key={item.cartKey} className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                <p className="text-[12px] text-slate-600 truncate flex-1">{item.name}</p>
+                <span className="text-[11px] text-red-400 font-medium shrink-0">품절</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          className="w-full h-10 text-white rounded-[6px] font-semibold text-sm touch-manipulation transition-colors"
+          style={{ background: PRIMARY }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#E85D20')}
+          onMouseLeave={e => (e.currentTarget.style.background = PRIMARY)}
+        >
+          확인
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── Session Expired Screens ──────────────────────────────────────
+function SessionExpiredScreen({ variant }: { variant: 'timeout' | 'closed' }) {
+  const isTimeout = variant === 'timeout';
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center px-10 text-center"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      {/* Background blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-[0.05]"
+          style={{ background: PRIMARY, transform: 'translate(35%,-35%)' }} />
+        <div className="absolute bottom-0 left-0 w-56 h-56 rounded-full opacity-[0.04]"
+          style={{ background: PRIMARY, transform: 'translate(-35%,35%)' }} />
+      </div>
+
+      {/* Icon */}
+      <div
+        className="w-16 h-16 rounded-full flex items-center justify-center mb-6"
+        style={{ background: `${PRIMARY}12` }}
+      >
+        {isTimeout
+          ? <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          : <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+        }
+      </div>
+
+      {/* Title */}
+      <p className="font-semibold text-[18px] leading-snug text-[#222] mb-3 whitespace-pre-line">
+        {isTimeout ? '주문 시간이 초과되었습니다' : '결제가 완료되어\n주문이 마감되었습니다'}
+      </p>
+
+      {/* Body */}
+      <p className="text-[14px] leading-relaxed text-[#999] max-w-[280px]">
+        {isTimeout
+          ? '장시간 활동이 없어 안전하게 연결을 종료했습니다.\nQR코드를 다시 찍어 주문을 진행해 주세요.'
+          : '이전 주문 및 결제가 정상적으로 처리되었습니다.\n추가 주문을 원하시면 QR코드를 다시 찍어주세요.'
+        }
+      </p>
+    </motion.div>
+  );
+}
+
+// ─── Network Error Screen ─────────────────────────────────────────
+function NetworkErrorScreen({ onRetry }: { onRetry: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] bg-white flex flex-col items-center justify-center px-8"
+    >
+      {/* Background blobs */}
+      <div className="absolute top-0 right-0 w-72 h-72 rounded-full pointer-events-none opacity-[0.05] bg-red-500" style={{ transform: 'translate(35%,-35%)' }} />
+      <div className="absolute bottom-0 left-0 w-56 h-56 rounded-full pointer-events-none opacity-[0.04] bg-red-500" style={{ transform: 'translate(-35%,35%)' }} />
+
+      <motion.div
+        initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.4 }}
+        className="flex flex-col items-center gap-5 w-full max-w-xs"
+      >
+        {/* Icon */}
+        <div className="w-20 h-20 rounded-full flex items-center justify-center bg-red-50">
+          <AlertTriangle size={34} className="text-red-500" />
+        </div>
+
+        {/* Text */}
+        <div className="text-center">
+          <p className="font-bold text-[#1d293d] text-[20px] leading-[28px] mb-2">연결이 원활하지 않습니다</p>
+          <p className="text-[#62748e] text-[14px] leading-[22.75px]">
+            통신 상태가 불안정하여 연결이 원활하지 않습니다.<br />
+            주변 환경이나 통신 상태를 확인하신 후<br />
+            다시 시도해 주세요.
+          </p>
+        </div>
+
+        {/* Button */}
+        <button
+          onClick={onRetry}
+          className="w-full h-12 text-white rounded-[6px] font-semibold text-sm flex items-center justify-center transition-colors touch-manipulation mt-2"
+          style={{ background: PRIMARY }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#E85D20')}
+          onMouseLeave={e => (e.currentTarget.style.background = PRIMARY)}
+        >
+          다시 시도하기
+        </button>
+      </motion.div>
+    </motion.div>
   );
 }
 
 // ─── Order Complete Screen ────────────────────────────────────────
-function OrderCompleteScreen({ orderId, storeName, tableId, onNewOrder }: {
-  orderId: string; storeName: string; tableId: string; onNewOrder: () => void;
-}) {
+function OrderCompleteScreen({ onConfirm }: { onConfirm: () => void }) {
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
-      <div className="text-center space-y-6 max-w-sm w-full">
-        <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', damping: 12, stiffness: 200 }}
-          className="mx-auto w-20 h-20 bg-green-500 rounded-[8px] flex items-center justify-center shadow-lg shadow-green-200">
-          <Check size={36} className="text-white" strokeWidth={3} />
-        </motion.div>
-        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}>
-          <h1 className="text-2xl font-black text-slate-800">주문 완료! 🎉</h1>
-          <p className="text-slate-400 mt-1 text-sm">주문이 성공적으로 접수되었습니다</p>
-        </motion.div>
-        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.45 }}
-          className="bg-slate-50 border border-slate-100 rounded-[6px] p-4 text-left space-y-0">
-          {[
-            { label: '주문 번호', value: <span className="font-mono font-bold text-slate-800 text-sm bg-white px-2.5 py-1 rounded-[4px] border border-slate-200">{orderId}</span> },
-            { label: '테이블',   value: <span className="font-bold text-slate-800 text-sm">{tableId}번</span> },
-            { label: '매장',     value: <span className="font-bold text-slate-800 text-sm">{storeName}</span> },
-          ].map(({ label, value }, i) => (
-            <div key={label} className={`flex justify-between items-center py-3 ${i > 0 ? 'border-t border-slate-100' : ''}`}>
-              <span className="text-slate-400 text-sm">{label}</span>
-              {value}
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-white flex flex-col"
+    >
+
+      {/* Background blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-[0.05]" style={{ background: PRIMARY, transform: 'translate(35%,-35%)' }} />
+        <div className="absolute bottom-0 left-0 w-56 h-56 rounded-full opacity-[0.04]" style={{ background: PRIMARY, transform: 'translate(-35%,35%)' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] rounded-full opacity-[0.03]" style={{ background: PRIMARY }} />
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-8 relative">
+
+        {/* Animated check ring */}
+        <motion.div
+          initial={{ scale: 0.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, type: 'spring', damping: 18, stiffness: 280 }}
+          className="relative mb-8"
+        >
+          {/* Ring */}
+          <div
+            className="relative w-28 h-28 rounded-full flex items-center justify-center"
+            style={{ background: `${PRIMARY}14`, border: `2.5px solid ${PRIMARY}30` }}
+          >
+            <div
+              className="w-20 h-20 rounded-full flex items-center justify-center"
+              style={{ background: PRIMARY }}
+            >
+              <Check size={36} className="text-white" strokeWidth={3} />
             </div>
-          ))}
+          </div>
         </motion.div>
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
-          className="text-slate-400 text-sm flex items-center justify-center gap-1.5">
-          <Clock size={13} />잠시 후 음식이 준비됩니다
-        </motion.p>
-        <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.7 }}>
-          <button onClick={onNewOrder} className="w-full h-11 bg-[#FF6B2B] text-white rounded-[4px] font-bold hover:bg-[#E85D20] active:scale-[0.98] transition-all shadow-md shadow-[#FF6B2B]/20">
-            추가 주문하기
+
+        {/* Text block */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-center mb-10"
+        >
+          <p className="font-black text-slate-800 text-2xl tracking-tight mb-2">주문 완료</p>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            주문이 성공적으로 접수되었습니다.<br />잠시 후 음식이 나올 예정입니다.
+          </p>
+        </motion.div>
+
+        {/* Confirm button */}
+        <motion.div
+          initial={{ y: 16, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.42 }}
+          className="w-full max-w-xs"
+        >
+          <button
+            onClick={onConfirm}
+            className="w-full h-12 text-white rounded-[8px] font-semibold text-base flex items-center justify-center gap-2 active:brightness-90 transition-all touch-manipulation shadow-sm"
+            style={{ background: PRIMARY }}
+          >
+            메뉴로 돌아가기
           </button>
         </motion.div>
       </div>
-    </div>
+
+      {/* Bottom safe area */}
+      <div className="pb-8" />
+    </motion.div>
   );
 }
 
 // ─── Staff Call Items ─────────────────────────────────────────────
 const STAFF_CALL_ITEMS = [
-  { id: 'banchan',  label: '반찬 리필',    icon: Utensils,   desc: '반찬을 더 주세요' },
-  { id: 'water',    label: '물 리필',      icon: Droplets,   desc: '물을 더 주세요' },
-  { id: 'utensils', label: '수저 / 포크',  icon: RefreshCw,  desc: '수저나 포크가 필요해요' },
-  { id: 'cleanup',  label: '빈 그릇 치우기', icon: Trash2,   desc: '다 먹은 그릇을 치워주세요' },
-  { id: 'bill',     label: '계산서 요청',  icon: CreditCard, desc: '계산서를 가져다 주세요' },
-  { id: 'etc',      label: '기타 문의',    icon: HelpCircle, desc: '직원을 불러주세요' },
+  { id: 'water',    label: '물' },
+  { id: 'plate',   label: '앞접시' },
+  { id: 'cup',      label: '컵' },
+  { id: 'napkin',   label: '냅킨' },
+  { id: 'wetTowel', label: '물티슈' },
+  { id: 'spoon',    label: '수저' },
+  { id: 'fork',     label: '젓가락' },
+  { id: 'banchan',  label: '반찬추가' },
+  { id: 'sauce',    label: '소스추가' },
 ] as const;
-
-type StaffCallId = typeof STAFF_CALL_ITEMS[number]['id'];
 
 // ─── Staff Call Sheet ─────────────────────────────────────────────
 function StaffCallSheet({
-  onClose,
-  onConfirm,
+  onClose, onConfirm,
 }: {
   onClose: () => void;
-  onConfirm: (item: typeof STAFF_CALL_ITEMS[number]) => void;
+  onConfirm: (summary: string) => void;
 }) {
-  const [selected, setSelected] = useState<StaffCallId | null>(null);
+  // qty-map for regular items (id → qty, 0 = not selected)
+  const [itemQty, setItemQty] = useState<Record<string, number>>({});
+  // 직원호출 toggle
+  const [staffToggle, setStaffToggle] = useState(false);
+
+  const addItem = (id: string) => {
+    setItemQty(prev => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+  };
+  const changeQty = (id: string, delta: number) => {
+    setItemQty(prev => {
+      const next = (prev[id] ?? 0) + delta;
+      if (next <= 0) {
+        const { [id]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [id]: next };
+    });
+  };
+
+  const selectedItems = STAFF_CALL_ITEMS.filter(i => (itemQty[i.id] ?? 0) > 0);
+  const hasAny = selectedItems.length > 0 || staffToggle;
+
+  const handleConfirm = () => {
+    const parts: string[] = [];
+    if (staffToggle) parts.push('직원호출');
+    selectedItems.forEach(i => {
+      const q = itemQty[i.id];
+      parts.push(q > 1 ? `${i.label} ${q}개` : i.label);
+    });
+    onConfirm(parts.join(', '));
+    onClose();
+  };
+
+  const startY = useRef(0);
+  const handleTouchStart = (e: React.TouchEvent) => { startY.current = e.touches[0].clientY; };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.changedTouches[0].clientY - startY.current > 70) onClose();
+  };
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 max-w-lg mx-auto flex flex-col justify-end">
-        <motion.div
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-          onClick={onClose}
-        />
-        <motion.div
-          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-          className="relative bg-white rounded-t-[8px] shadow-2xl flex flex-col"
+    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 36, stiffness: 360 }}
+        className="relative bg-white rounded-tl-[12px] rounded-tr-[12px] shadow-2xl flex flex-col max-h-[80vh]"
+      >
+        {/* Handle */}
+        <div
+          className="flex justify-center pt-3 pb-2 shrink-0 cursor-pointer touch-manipulation"
+          onClick={onClose} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
         >
-          {/* Handle */}
-          <div className="flex justify-center pt-3 pb-0 shrink-0">
-            <div className="w-10 h-1 bg-slate-200 rounded-full" />
+          <div className="w-10 h-1 bg-slate-200 rounded-full" />
+        </div>
+
+        {/* Header — 직원호출 토글을 헤더 우측 고정 */}
+        <div className="flex items-center px-4 py-2.5 border-b border-slate-100 shrink-0">
+          <Bell size={16} className="text-slate-600 shrink-0" />
+          <span className="font-semibold text-slate-800 text-sm ml-2 flex-1">직원호출</span>
+          <button
+            onClick={() => setStaffToggle(t => !t)}
+            className="h-8 px-3 flex items-center gap-1.5 rounded-full border text-xs font-semibold transition-all touch-manipulation"
+            style={staffToggle
+              ? { background: PRIMARY, borderColor: PRIMARY, color: '#fff' }
+              : { background: '#fff', borderColor: '#e2e8f0', color: '#64748b' }
+            }
+          >
+            <Bell size={11} strokeWidth={2.5} />
+            직원호출
+            {/* on/off indicator dot */}
+            <span
+              className="w-1.5 h-1.5 rounded-full ml-0.5"
+              style={{ background: staffToggle ? 'rgba(255,255,255,0.7)' : '#cbd5e1' }}
+            />
+          </button>
+        </div>
+
+        <div className="subtle-box flex-1 px-4 pb-2">
+          {/* Chips — 일반 아이템만 */}
+          <div className="flex flex-wrap gap-2 pt-3 mb-4">
+            {STAFF_CALL_ITEMS.map(item => (
+              <button
+                key={item.id}
+                onClick={() => addItem(item.id)}
+                className="h-9 px-3.5 flex items-center gap-1.5 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium transition-colors active:bg-slate-50 touch-manipulation"
+              >
+                <Plus size={12} className="text-slate-400" strokeWidth={2.5} />
+                {item.label}
+              </button>
+            ))}
           </div>
 
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-[#FF6B2B]/10 rounded-[4px] flex items-center justify-center">
-                <Bell size={14} className="text-[#FF6B2B]" />
-              </div>
-              <div>
-                <p className="font-bold text-slate-800 text-sm">직원 호출</p>
-                <p className="text-[11px] text-slate-400">무엇이 필요하신가요?</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-7 h-7 bg-slate-100 rounded-[4px] flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
-            >
-              <X size={14} />
-            </button>
-          </div>
+          {/* Selected items list */}
+          <AnimatePresence>
+            {selectedItems.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18 }}
+                className="overflow-hidden"
+              >
+                <div className="border-t border-slate-100 pt-3 space-y-1">
+                  {selectedItems.map(item => {
+                    const qty = itemQty[item.id] ?? 0;
+                    return (
+                      <div key={item.id} className="flex items-center h-10 gap-2">
+                        <span className="flex-1 text-slate-700 text-sm font-medium">{item.label}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => changeQty(item.id, -1)}
+                            className="w-7 h-7 rounded-[4px] flex items-center justify-center transition-colors touch-manipulation"
+                            style={qty === 1 ? { background: '#d72b2b' } : { background: '#f1f5f9' }}
+                          >
+                            {qty === 1
+                              ? <X size={11} className="text-white" strokeWidth={2.5} />
+                              : <Minus size={11} className="text-slate-500" strokeWidth={2.5} />
+                            }
+                          </button>
+                          <span className="text-slate-800 font-semibold text-sm w-5 text-center tabular-nums">{qty}</span>
+                          <button
+                            onClick={() => changeQty(item.id, 1)}
+                            className="w-7 h-7 bg-slate-100 rounded-[4px] flex items-center justify-center text-slate-500 touch-manipulation"
+                          >
+                            <Plus size={11} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
-          {/* List */}
-          <div className="px-4 py-3 grid grid-cols-2 gap-2">
-            {STAFF_CALL_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isSelected = selected === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setSelected(item.id)}
-                  className={`relative flex flex-col items-start gap-2 p-3.5 rounded-[6px] border text-left transition-all active:scale-[0.97] ${
-                    isSelected
-                      ? 'bg-[#FF6B2B]/6 border-[#FF6B2B] shadow-sm shadow-[#FF6B2B]/10'
-                      : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-white'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-[4px] flex items-center justify-center ${
-                    isSelected ? 'bg-[#FF6B2B] text-white' : 'bg-white text-slate-500 border border-slate-200'
-                  }`}>
-                    <Icon size={15} />
-                  </div>
-                  <div>
-                    <p className={`text-sm font-semibold leading-tight ${isSelected ? 'text-[#FF6B2B]' : 'text-slate-700'}`}>
-                      {item.label}
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{item.desc}</p>
-                  </div>
-                  {isSelected && (
-                    <div className="absolute top-2.5 right-2.5">
-                      <Check size={12} className="text-[#FF6B2B]" strokeWidth={3} />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 pb-8 pt-2">
-            <button
-              onClick={() => {
-                const found = STAFF_CALL_ITEMS.find(i => i.id === selected);
-                if (found) { onConfirm(found); onClose(); }
-              }}
-              disabled={!selected}
-              className="w-full h-11 bg-[#FF6B2B] text-white rounded-[4px] font-bold flex items-center justify-center gap-2 shadow-md shadow-[#FF6B2B]/20 hover:bg-[#E85D20] active:scale-[0.98] disabled:opacity-35 disabled:cursor-not-allowed transition-all"
-            >
-              <Bell size={14} />
-              직원 호출하기
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+        {/* Footer */}
+        <div className="px-4 pb-8 pt-3 border-t border-slate-100 shrink-0">
+          <button
+            onClick={handleConfirm}
+            disabled={!hasAny}
+            className="w-full h-12 text-white rounded-[6px] font-semibold text-base flex items-center justify-center active:brightness-90 transition-all disabled:opacity-35 touch-manipulation"
+            style={{ background: hasAny ? PRIMARY : '#94a3b8' }}
+          >
+            호출하기
+          </button>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────
 export function CustomerMenuPage() {
   const { storeId = 'demo', tableId = '1' } = useParams<{ storeId: string; tableId: string }>();
-  const store = STORES[storeId] ?? { name: '매장', emoji: '🍽', notice: undefined };
+  const store = STORES[storeId] ?? { name: '매장', notice: undefined };
 
   const [phase, setPhase] = useState<Phase>('loading');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('전체');
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [orderHistory, setOrderHistory] = useState<OrderRecord[]>([]);
+
   const [cartOpen, setCartOpen] = useState(false);
-  const [staffCalled, setStaffCalled] = useState(false);
-  const [staffCallReason, setStaffCallReason] = useState('');
-  const [orderId, setOrderId] = useState('');
-  const [detailItem, setDetailItem] = useState<MenuItem | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [staffCallOpen, setStaffCallOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState<MenuItem | null>(null);
+
+  const [staffCalled, setStaffCalled] = useState(false);
+  const [staffCallMsg, setStaffCallMsg] = useState('');
+  const [devNavOpen, setDevNavOpen] = useState(false);
   const staffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const categoryBarRef = useRef<HTMLDivElement>(null);
+  const [networkError, setNetworkError] = useState(!navigator.onLine);
+
+  const [orderProcessing, setOrderProcessing] = useState(false);
+  const [orderError, setOrderError] = useState<'network' | 'duplicate' | null>(null);
+  const [duplicateTime, setDuplicateTime] = useState('');
+  const [soldoutModal, setSoldoutModal] = useState(false);
+  const [soldoutItems, setSoldoutItems] = useState<CartItem[]>([]);
+  const [cartSoldoutActive, setCartSoldoutActive] = useState(false);
+  const [runtimeSoldout, setRuntimeSoldout] = useState<Set<string>>(new Set());
+
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerH, setHeaderH] = useState(148);
 
   useEffect(() => {
-    const timer = setTimeout(() => setPhase('menu'), 2600);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setPhase('menu'), 2200);
+    return () => clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    const handleOffline = () => setNetworkError(true);
+    const handleOnline  = () => setNetworkError(false);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online',  handleOnline);
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online',  handleOnline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!headerRef.current || phase !== 'menu') return;
+    const ro = new ResizeObserver(() => setHeaderH(headerRef.current?.offsetHeight ?? 148));
+    ro.observe(headerRef.current);
+    return () => ro.disconnect();
+  }, [phase]);
+
+  useEffect(() => {
+    if (!devNavOpen) return;
+    const handler = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest('[data-devnav]')) setDevNavOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [devNavOpen]);
+
   const totalItems = cart.reduce((s, i) => s + i.qty, 0);
-  const totalPrice = cart.reduce((s, i) => s + (i.price + i.optionPrice) * i.qty, 0);
+  const totalOrderedQty = orderHistory.reduce((s, o) => s + o.items.reduce((ss, i) => ss + i.qty, 0), 0);
 
-  // ── Add to cart (with options) ──
-  const addToCartWithOptions = (item: MenuItem, opts: SelectedOptions, qty: number) => {
-    const basePrice = item.timeSalePrice ?? item.price;
-    const optionPrice = calcOptionPrice(item, opts);
-    const optionLabel = buildOptionLabel(item, opts);
-    const cartKey = buildCartKey(item.id, opts);
+  const addToCartWithOptions = useCallback((item: MenuItem, opts: SelectedOptions, mq: MultiQtyMap, qty: number) => {
+    const basePrice = item.price;
+    const optionPrice = calcOptionPrice(item, opts, mq);
+    const optionLabel = buildOptionLabel(item, opts, mq);
+    const optionLines = buildOptionLines(item, opts, mq);
+    const cartKey = buildCartKey(item.id, opts, mq);
     setCart(prev => {
-      const existing = prev.find(c => c.cartKey === cartKey);
-      if (existing) return prev.map(c => c.cartKey === cartKey ? { ...c, qty: c.qty + qty } : c);
-      return [...prev, {
-        cartKey,
-        menuId: item.id,
-        name: item.name,
-        optionLabel: optionLabel || undefined,
-        price: basePrice,
-        originalPrice: item.price,
-        optionPrice,
-        qty,
-      }];
+      const ex = prev.find(c => c.cartKey === cartKey);
+      if (ex) return prev.map(c => c.cartKey === cartKey ? { ...c, qty: c.qty + qty } : c);
+      return [...prev, { cartKey, menuId: item.id, name: item.name, optionLabel: optionLabel || undefined, optionLines: optionLines.length ? optionLines : undefined, price: basePrice, optionPrice, qty }];
     });
-  };
+  }, []);
 
-  // ── Simple add (no options) ──
-  const handlePlusClick = (item: MenuItem) => {
-    const hasOptions = (item.optionGroups?.length ?? 0) > 0;
-    if (hasOptions) {
-      setDetailItem(item);
-    } else {
-      addToCartWithOptions(item, {}, 1);
-    }
-  };
+  const cartAddByKey = (key: string) => setCart(prev => prev.map(c => c.cartKey === key ? { ...c, qty: c.qty + 1 } : c));
+  const cartRemoveByKey = (key: string) => setCart(prev => {
+    const ex = prev.find(c => c.cartKey === key);
+    if (!ex) return prev;
+    if (ex.qty === 1) return prev.filter(c => c.cartKey !== key);
+    return prev.map(c => c.cartKey === key ? { ...c, qty: c.qty - 1 } : c);
+  });
+  const cartDeleteByKey = (key: string) => setCart(prev => prev.filter(c => c.cartKey !== key));
 
-  // ── Qty adjust in list (simple items already in cart) ──
-  const handleMinusClick = (item: MenuItem) => {
-    const cartKey = buildCartKey(item.id, {});
-    setCart(prev => {
-      const existing = prev.find(c => c.cartKey === cartKey);
-      if (!existing) return prev;
-      if (existing.qty === 1) return prev.filter(c => c.cartKey !== cartKey);
-      return prev.map(c => c.cartKey === cartKey ? { ...c, qty: c.qty - 1 } : c);
-    });
-  };
-
-  // ── Cart drawer add/remove by cartKey ──
-  const cartAddByKey = (cartKey: string) => {
-    setCart(prev => prev.map(c => c.cartKey === cartKey ? { ...c, qty: c.qty + 1 } : c));
-  };
-
-  const cartRemoveByKey = (cartKey: string) => {
-    setCart(prev => {
-      const existing = prev.find(c => c.cartKey === cartKey);
-      if (!existing) return prev;
-      if (existing.qty === 1) return prev.filter(c => c.cartKey !== cartKey);
-      return prev.map(c => c.cartKey === cartKey ? { ...c, qty: c.qty - 1 } : c);
-    });
-  };
-
-  // ── Get displayed qty (simple items only; option items show 0 so + always opens sheet) ──
-  const getSimpleQty = (item: MenuItem) => {
-    const hasOptions = (item.optionGroups?.length ?? 0) > 0;
-    if (hasOptions) return 0; // always show + for option items
-    return cart.find(c => c.cartKey === item.id)?.qty ?? 0;
-  };
-
-  const placeOrder = () => {
-    const id = `ORD-${Date.now().toString().slice(-6)}`;
-    setOrderId(id);
-    setCartOpen(false);
+  const commitOrder = (cartSnapshot: CartItem[]) => {
+    const total = cartSnapshot.reduce((s, i) => s + (i.price + i.optionPrice) * i.qty, 0);
+    setOrderHistory(prev => [...prev, {
+      orderId: `ORD-${Date.now().toString().slice(-6)}`,
+      time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+      items: cartSnapshot, total,
+    }]);
     setCart([]);
-    setPhase('ordered');
+    setOrderProcessing(false);
+    setPhase('complete');
   };
 
-  const callStaff = (reason = '') => {
-    setStaffCallReason(reason);
+  const doOrder = useCallback((cartSnapshot: CartItem[]) => {
+    setSoldoutModal(false);
+    setCartSoldoutActive(false);
+    setCartOpen(false);
+    setOrderProcessing(true);
+    setTimeout(() => commitOrder(cartSnapshot), 1800);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const soldoutMenuIds = useMemo(() => {
+    const ids = new Set<string>(runtimeSoldout);
+    MENU_ITEMS.filter(m => m.status === 'soldout').forEach(m => ids.add(m.id));
+    return ids;
+  }, [runtimeSoldout]);
+
+  const initiateOrder = () => {
+    if (cart.length === 0) return;
+
+    // Limited-qty items become soldout at order time — simulate concurrent stock exhaustion
+    const newlySoldout = cart
+      .map(ci => MENU_ITEMS.find(m => m.id === ci.menuId))
+      .filter((m): m is MenuItem => !!m && m.limitedQty != null && !soldoutMenuIds.has(m.id))
+      .map(m => m.id);
+
+    const effectiveSoldout = newlySoldout.length > 0
+      ? new Set([...soldoutMenuIds, ...newlySoldout])
+      : soldoutMenuIds;
+
+    const hasSoldout = cart.some(ci => effectiveSoldout.has(ci.menuId));
+    if (hasSoldout) {
+      if (newlySoldout.length > 0) setRuntimeSoldout(prev => new Set([...prev, ...newlySoldout]));
+      setSoldoutItems(cart.filter(ci => effectiveSoldout.has(ci.menuId)));
+      setSoldoutModal(true);
+      return;
+    }
+    doOrder(cart);
+  };
+
+  const callStaff = (summary: string) => {
+    setStaffCallMsg(summary);
     setStaffCalled(true);
     if (staffTimerRef.current) clearTimeout(staffTimerRef.current);
     staffTimerRef.current = setTimeout(() => setStaffCalled(false), 4000);
   };
 
+  // ── Filtered & grouped menu ──
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return MENU_ITEMS;
+    return MENU_ITEMS.filter(i => i.name.toLowerCase().includes(q) || (i.description ?? '').toLowerCase().includes(q));
+  }, [searchQuery]);
+
   const groupedMenu = useMemo(() => {
-    if (selectedCategory !== '전체') {
-      return { [selectedCategory]: MENU_ITEMS.filter(i => i.category === selectedCategory) };
-    }
-    const groups: Record<string, MenuItem[]> = {};
-    CATEGORIES.slice(1).forEach(cat => {
-      const items = MENU_ITEMS.filter(i => i.category === cat);
-      if (items.length > 0) groups[cat] = items;
-    });
-    return groups;
-  }, [selectedCategory]);
+    const cats = selectedCategory === '전체' ? CATEGORIES.slice(1) : [selectedCategory];
+    return cats.map(cat => ({ cat, items: filteredItems.filter(i => i.category === cat) })).filter(g => g.items.length);
+  }, [filteredItems, selectedCategory]);
+
+  const scrollToCategory = (cat: string) => {
+    setSelectedCategory(cat);
+    const ref = cat === '전체' ? sectionRefs.current[CATEGORIES[1]] : sectionRefs.current[cat];
+    if (ref) window.scrollTo({ top: ref.getBoundingClientRect().top + window.scrollY - headerH - 4, behavior: 'smooth' });
+  };
 
   if (phase === 'loading') return <LoadingScreen storeName={store.name} tableId={tableId} />;
-  if (phase === 'ordered') {
-    return (
-      <OrderCompleteScreen
-        orderId={orderId} storeName={store.name} tableId={tableId}
-        onNewOrder={() => { setPhase('menu'); setSelectedCategory('전체'); }}
-      />
-    );
-  }
+  if (phase === 'complete') return (
+    <AnimatePresence>
+      <OrderCompleteScreen onConfirm={() => setPhase('menu')} />
+    </AnimatePresence>
+  );
+  if (phase === 'session-timeout') return <AnimatePresence><SessionExpiredScreen variant="timeout" /></AnimatePresence>;
+  if (phase === 'session-closed') return <AnimatePresence><SessionExpiredScreen variant="closed" /></AnimatePresence>;
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
-      className="min-h-screen bg-[#f1f5f9] flex flex-col max-w-lg mx-auto relative"
-    >
-      {/* ── Sticky Header ── */}
-      <div className="sticky top-0 z-30 bg-white border-b border-slate-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-[#FF6B2B] rounded-[6px] flex items-center justify-center shrink-0">
-              <span className="text-white font-black text-[10px]">QR</span>
-            </div>
-            <div>
-              <p className="font-bold text-slate-800 text-sm leading-tight">{store.name}</p>
-              <span className="text-[10px] font-semibold text-[#FF6B2B] bg-orange-50 px-1.5 py-0.5 rounded-[3px]">
+    <div className="subtle-box bg-slate-50 h-screen overflow-y-auto" style={{ paddingTop: headerH }}>
+
+      {/* ── Fixed Header ── */}
+      <div ref={headerRef} className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200">
+
+        {/* Row 1 (narrow: 로고+버튼 한 줄 / wide: 로고+매장정보+버튼 한 줄) */}
+        <div className="flex flex-wrap items-center gap-x-2.5 px-3 sm:px-4 pt-2.5 pb-1 sm:py-2.5">
+          {/* Logo — order-1 항상 맨 앞 */}
+          <div
+            className="order-1 w-10 h-10 rounded-[6px] shrink-0 flex items-center justify-center border"
+            style={{ background: `${PRIMARY}12`, borderColor: `${PRIMARY}25` }}
+          >
+            <ShoppingCart size={18} style={{ color: PRIMARY }} />
+          </div>
+
+          {/* 매장명·테이블 — narrow: order-3 → 다음 줄 full-width / sm+: order-2 → 로고 옆 inline */}
+          <div className="order-3 sm:order-2 w-full sm:w-auto sm:flex-1 min-w-0 pt-2 pb-2 sm:py-0">
+            <p className="font-semibold text-slate-800 text-sm leading-tight truncate">{store.name}</p>
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-[3px]"
+                style={{ background: `${PRIMARY}12`, color: PRIMARY }}
+              >
                 {tableId}번 테이블
               </span>
+              <Users size={11} className="text-slate-400" />
+              <span className="text-slate-400 text-xs">2명 이용중</span>
             </div>
           </div>
-          <button
-            onClick={() => setStaffCallOpen(true)}
-            className={`flex items-center gap-1.5 px-3 h-8 rounded-[4px] text-xs font-semibold border transition-all active:scale-95 ${
-              staffCalled ? 'bg-[#FF6B2B] text-white border-[#FF6B2B]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <Bell size={12} className={staffCalled ? 'animate-bounce' : ''} />
-            {staffCalled ? '호출 완료!' : '직원 호출'}
-          </button>
+
+          {/* 액션 버튼 — narrow: order-2 → 로고 바로 옆 (ml-auto으로 우측 정렬) / sm+: order-3 */}
+          <div className="order-2 sm:order-3 ml-auto sm:ml-0 flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => setStaffCallOpen(true)}
+              className="h-8 px-3 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 touch-manipulation border"
+              style={staffCalled
+                ? { background: PRIMARY, borderColor: PRIMARY, color: '#fff' }
+                : { background: `${PRIMARY}10`, borderColor: `${PRIMARY}25`, color: PRIMARY }
+              }
+            >
+              <Bell size={12} className={staffCalled ? 'animate-bounce' : ''} />
+              직원호출
+            </button>
+            <button
+              onClick={() => setHistoryOpen(true)}
+              className="h-8 px-3 rounded-[4px] text-xs font-medium relative flex items-center gap-1.5 touch-manipulation border transition-all"
+              style={{ background: `${PRIMARY}10`, borderColor: `${PRIMARY}25`, color: PRIMARY }}
+            >
+              <Receipt size={12} />
+              주문내역
+              {totalOrderedQty > 0 && (
+                <span className="absolute -top-1 -right-1 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center" style={{ background: PRIMARY }}>
+                  {totalOrderedQty > 9 ? '9+' : totalOrderedQty}
+                </span>
+              )}
+            </button>
+
+            {/* Dev nav button */}
+            <div className="relative" data-devnav>
+              <button
+                onClick={() => setDevNavOpen(v => !v)}
+                className="h-8 w-8 rounded-[4px] flex items-center justify-center touch-manipulation border transition-all"
+                style={{ background: devNavOpen ? '#f1f5f9' : 'transparent', borderColor: '#e2e8f0', color: '#64748b' }}
+              >
+                <Settings size={14} />
+              </button>
+              <AnimatePresence>
+                {devNavOpen && (
+                  <motion.div
+                    className="absolute top-full right-0 mt-1.5 bg-white rounded-[8px] shadow-[0_4px_20px_rgba(0,0,0,0.12)] border border-slate-200 overflow-hidden z-50 min-w-[160px]"
+                    initial={{ opacity: 0, scale: 0.94, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.94, y: -4 }}
+                    transition={{ duration: 0.13 }}
+                  >
+                    <div className="px-3 pt-2.5 pb-1.5">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">페이지 이동</p>
+                    </div>
+                    <a
+                      href="/login"
+                      className="flex items-center gap-2 px-3 py-2.5 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors"
+                      onClick={() => setDevNavOpen(false)}
+                    >
+                      <span className="w-5 h-5 rounded-[4px] bg-slate-100 flex items-center justify-center text-[10px]">🛡</span>
+                      관리자 페이지
+                    </a>
+                    <a
+                      href="/client/login"
+                      className="flex items-center gap-2 px-3 py-2.5 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors border-t border-slate-100"
+                      onClick={() => setDevNavOpen(false)}
+                    >
+                      <span className="w-5 h-5 rounded-[4px] bg-slate-100 flex items-center justify-center text-[10px]">🏪</span>
+                      클라이언트 페이지
+                    </a>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
 
-        {store.notice && (
-          <div className="bg-orange-50 border-t border-orange-100 px-4 py-2 flex items-start gap-2">
-            <Clock size={11} className="text-[#FF6B2B] shrink-0 mt-px" />
-            <p className="text-xs text-[#FF6B2B] font-medium leading-snug">{store.notice}</p>
+        {/* Row 2: Search */}
+        <div className="px-3 sm:px-4 pb-2">
+          <div
+            className="flex items-center gap-2 bg-slate-100 rounded-[6px] px-3 h-9 border transition-colors focus-within:bg-white"
+            style={{ borderColor: 'transparent' }}
+            onFocus={e => (e.currentTarget.style.borderColor = `${PRIMARY}40`)}
+            onBlur={e => (e.currentTarget.style.borderColor = 'transparent')}
+          >
+            <Search size={15} className="text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="메뉴 검색"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="flex-1 text-slate-700 placeholder-slate-400 text-sm bg-transparent outline-none"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600 touch-manipulation">
+                <X size={14} />
+              </button>
+            )}
           </div>
-        )}
+        </div>
 
-        <div ref={categoryBarRef} className="border-t border-slate-100 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-          <div className="flex px-2 min-w-max">
-            {CATEGORIES.map(cat => {
+        {/* Row 3: Category tabs */}
+        {!searchQuery && (
+          <div className="overflow-x-auto flex gap-1.5 px-3 sm:px-4 pb-2.5 [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none] touch-pan-x">
+            {[...CATEGORIES, TEST_CATEGORY].map(cat => {
               const isActive = selectedCategory === cat;
+              const isTest = cat === TEST_CATEGORY;
+              const hasSoldoutInCat = !isTest && cat !== '전체' && MENU_ITEMS.some(m => m.category === cat && soldoutMenuIds.has(m.id));
               return (
                 <button
                   key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`relative px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
-                    isActive ? 'text-[#FF6B2B]' : 'text-slate-400 hover:text-slate-600'
+                  onClick={() => isTest ? setSelectedCategory(TEST_CATEGORY) : scrollToCategory(cat)}
+                  className={`relative h-7 px-3 sm:px-3.5 rounded-[4px] text-xs font-medium whitespace-nowrap shrink-0 transition-colors touch-manipulation ${
+                    isActive
+                      ? isTest ? 'text-white bg-violet-500' : 'text-white'
+                      : isTest ? 'bg-violet-50 text-violet-600 border border-violet-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
+                  style={isActive && !isTest ? { background: PRIMARY } : {}}
                 >
                   {cat}
-                  {isActive && (
-                    <motion.span layoutId="categoryUnderline" className="absolute bottom-0 left-2 right-2 h-[2px] bg-[#FF6B2B]" />
+                  {hasSoldoutInCat && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 border border-white" />
                   )}
                 </button>
               );
             })}
           </div>
-        </div>
+        )}
+
       </div>
+
+      {/* ── Test Panel ── */}
+      {selectedCategory === TEST_CATEGORY && (
+        <div className="pb-24 px-4 pt-4">
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-violet-500 uppercase tracking-wider mb-0.5">개발 전용</p>
+            <p className="text-slate-400 text-xs">버튼을 눌러 각 상태 화면을 미리 확인하세요</p>
+          </div>
+
+          {[
+            {
+              section: '페이지 상태',
+              items: [
+                { label: '로딩 화면', desc: 'QRorder 로딩 스크린', action: () => setPhase('loading') },
+                { label: '주문 완료', desc: '주문 성공 완료 화면', action: () => setPhase('complete') },
+                { label: '주문 처리중', desc: '처리 딜레이 로딩 오버레이', action: () => { setOrderProcessing(true); setTimeout(() => setOrderProcessing(false), 3000); } },
+                { label: '주문 실패 (네트워크)', desc: '연결 실패 — 다시 시도 가능', action: () => setOrderError('network') },
+                { label: '주문 실패 (중복)', desc: '동일 테이블 선주문 충돌', action: () => { setDuplicateTime('10:52'); setOrderError('duplicate'); } },
+                { label: '품절 확인 모달', desc: '장바구니 내 품절 메뉴 안내', action: () => setSoldoutModal(true) },
+                { label: '네트워크 오류', desc: '연결 끊김 오버레이', action: () => setNetworkError(true) },
+                { label: '주문 시간 초과', desc: '세션 만료 — 장시간 비활동', action: () => setPhase('session-timeout') },
+                { label: '주문 마감', desc: '세션 만료 — 결제 완료', action: () => setPhase('session-closed') },
+                { label: '한정수량 품절 처리', desc: '비빔밥·제육볶음 품절 시뮬레이션', action: () => setRuntimeSoldout(new Set(['4', '5'])) },
+                { label: '품절 초기화', desc: '한정수량 품절 상태 리셋', action: () => setRuntimeSoldout(new Set()) },
+              ],
+            },
+            {
+              section: '바텀 시트',
+              items: [
+                { label: '장바구니', desc: `현재 ${cart.length}개 아이템`, action: () => setCartOpen(true) },
+                { label: '주문내역', desc: `${orderHistory.length}개 주문 기록`, action: () => setHistoryOpen(true) },
+                { label: '직원호출', desc: '요청 선택 시트', action: () => setStaffCallOpen(true) },
+              ],
+            },
+            {
+              section: '메뉴 상세',
+              items: MENU_ITEMS.slice(0, 4).map(item => ({
+                label: item.name,
+                desc: `${item.price.toLocaleString()}원 · ${item.optionGroups?.length ? `옵션 ${item.optionGroups.length}그룹` : '옵션 없음'}`,
+                action: () => setDetailItem(item),
+              })),
+            },
+          ].map(({ section, items }) => (
+            <div key={section} className="mb-5">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{section}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {items.map(({ label, desc, action }) => (
+                  <button
+                    key={label}
+                    onClick={action}
+                    className="flex items-center gap-3 px-4 py-3 bg-white rounded-[8px] border border-slate-200 hover:border-violet-300 hover:bg-violet-50/50 transition-colors text-left touch-manipulation group"
+                  >
+                    <div className="w-2 h-2 rounded-full shrink-0 bg-violet-300 group-hover:bg-violet-500 transition-colors" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-700 group-hover:text-violet-700">{label}</p>
+                      <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Menu Content ── */}
-      <div className="flex-1 pb-24">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={selectedCategory}
-            initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-          >
-            {Object.entries(groupedMenu).map(([cat, items]) => (
-              <div key={cat}>
-                {selectedCategory === '전체' && (
-                  <div className="px-4 pt-5 pb-2 flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{cat}</span>
-                    <span className="text-[10px] text-slate-300 font-medium">{items.length}개</span>
-                  </div>
-                )}
-                <div className="px-3 space-y-2 py-1">
-                  {items.map(item => (
-                    <MenuItemCard
-                      key={item.id}
-                      item={item}
-                      qty={getSimpleQty(item)}
-                      onAdd={() => handlePlusClick(item)}
-                      onRemove={() => handleMinusClick(item)}
-                      onOpenDetail={() => setDetailItem(item)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-            {Object.keys(groupedMenu).length === 0 && (
-              <div className="flex flex-col items-center justify-center py-24">
-                <Package size={36} className="text-slate-200 mb-3" />
-                <p className="text-slate-400 text-sm">이 카테고리에 메뉴가 없습니다</p>
-              </div>
+      {selectedCategory !== TEST_CATEGORY && <div className="pb-24">
+        {groupedMenu.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <Package size={40} className="text-slate-200 mb-3" />
+            <p className="text-slate-400 text-sm">
+              {searchQuery ? `"${searchQuery}"에 대한 메뉴가 없습니다` : '메뉴가 없습니다'}
+            </p>
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="mt-3 text-sm underline touch-manipulation" style={{ color: PRIMARY }}>
+                검색 초기화
+              </button>
             )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+          </div>
+        ) : (
+          groupedMenu.map(({ cat, items }) => (
+            <div key={cat} ref={el => { sectionRefs.current[cat] = el; }}>
+              {/* Category header */}
+              <div className="px-4 py-2 bg-slate-50 border-y border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-slate-700 text-xs tracking-wide">{cat}</p>
+                </div>
+                <span className="text-slate-400 text-xs tabular-nums">{items.length}개</span>
+              </div>
 
-      {/* ── Cart Bar ── */}
+              {/* Menu items — 1 col on mobile, 2 col on sm+ */}
+              <div className="bg-white grid grid-cols-1 sm:grid-cols-2 divide-x-0 sm:divide-x divide-slate-100">
+                {items.map(item => (
+                  <MenuItemCard
+                    key={item.id}
+                    item={item}
+                    runtimeSoldout={runtimeSoldout}
+                    onAdd={() => setDetailItem(item)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>}
+
+      {/* ── Cart Bar (sticky bottom) ── */}
       <AnimatePresence>
-        {totalItems > 0 && (
+        {totalItems > 0 && !cartOpen && (
           <motion.div
             initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 260 }}
-            className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto z-30 px-4 pb-5 pt-2"
+            transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+            className="fixed bottom-0 left-0 right-0 z-30"
           >
             <button
               onClick={() => setCartOpen(true)}
-              className="w-full h-12 bg-[#FF6B2B] rounded-[4px] flex items-center justify-between px-4 shadow-xl shadow-[#FF6B2B]/30 hover:bg-[#E85D20] active:scale-[0.98] transition-all"
+              className="w-full h-14 text-white flex items-center justify-between px-4 sm:px-6 active:brightness-90 transition-all touch-manipulation"
+              style={{ background: PRIMARY }}
             >
               <div className="flex items-center gap-2.5">
-                <div className="relative">
-                  <ShoppingCart size={16} className="text-white" />
-                  <span className="absolute -top-2 -right-2 w-4 h-4 bg-white text-[#FF6B2B] text-[9px] font-black rounded-[3px] flex items-center justify-center tabular-nums">
-                    {totalItems}
-                  </span>
+                <div className="w-6 h-6 bg-white/20 rounded-[4px] flex items-center justify-center">
+                  <ShoppingCart size={14} className="text-white" />
                 </div>
-                <span className="text-white font-bold text-sm">{totalItems}개 담음</span>
+                <span className="font-semibold text-sm text-white/90">{totalItems}개 담음</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-white font-black tabular-nums">{totalPrice.toLocaleString()}원</span>
+                <span className="font-bold tabular-nums">
+                  {cart.reduce((s, i) => s + (i.price + i.optionPrice) * i.qty, 0).toLocaleString()}원
+                </span>
                 <ChevronRight size={16} className="text-white/70" />
               </div>
             </button>
@@ -1167,58 +1878,88 @@ export function CustomerMenuPage() {
         )}
       </AnimatePresence>
 
-      {/* ── Cart Drawer ── */}
-      {cartOpen && (
-        <CartDrawer
-          cart={cart}
-          onAdd={cartAddByKey}
-          onRemove={cartRemoveByKey}
-          onClose={() => setCartOpen(false)}
-          onOrder={placeOrder}
-        />
-      )}
-
-      {/* ── Menu Detail Sheet ── */}
-      {detailItem && (
-        <MenuDetailSheet
-          item={detailItem}
-          onClose={() => setDetailItem(null)}
-          onAddToCart={(opts, qty) => addToCartWithOptions(detailItem, opts, qty)}
-        />
-      )}
-
-      {/* ── Staff Call Sheet ── */}
-      {staffCallOpen && (
-        <StaffCallSheet
-          onClose={() => setStaffCallOpen(false)}
-          onConfirm={(item) => {
-            callStaff(item.label);
-          }}
-        />
-      )}
-
-      {/* ── Staff Toast ── */}
+      {/* ── Staff call toast ── */}
       <AnimatePresence>
         {staffCalled && (
           <motion.div
-            initial={{ opacity: 0, y: -16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -16, scale: 0.97 }}
-            transition={{ type: 'spring', damping: 20, stiffness: 260 }}
-            className="fixed top-20 left-4 right-4 max-w-sm mx-auto z-50"
+            initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10 }}
+            className="fixed top-4 left-4 right-4 max-w-sm mx-auto z-50"
           >
-            <div className="bg-slate-800 text-white px-4 py-3 rounded-[6px] flex items-center gap-3 shadow-xl">
-              <div className="w-8 h-8 bg-[#FF6B2B] rounded-[4px] flex items-center justify-center shrink-0">
+            <div className="bg-slate-800 text-white px-4 py-3 rounded-[8px] flex items-center gap-3 shadow-xl">
+              <div className="w-8 h-8 rounded-[6px] flex items-center justify-center shrink-0" style={{ background: PRIMARY }}>
                 <Bell size={15} className="animate-bounce" />
               </div>
               <div>
-                <p className="font-bold text-sm">직원 호출 완료</p>
-                <p className="text-slate-400 text-xs">{staffCallReason && `${staffCallReason} · `}잠시만 기다려주세요 😊</p>
+                <p className="font-semibold text-sm">직원 호출 완료</p>
+                <p className="text-slate-400 text-xs mt-0.5">{staffCallMsg && `${staffCallMsg} · `}잠시만 기다려 주세요</p>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+
+      {/* ── Sheets ── */}
+      <AnimatePresence>
+        {detailItem && (
+          <MenuDetailSheet
+            item={detailItem}
+            onClose={() => setDetailItem(null)}
+            onAddToCart={(opts, mq, qty) => addToCartWithOptions(detailItem, opts, mq, qty)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {cartOpen && (
+          <CartSheet cart={cart} onAdd={cartAddByKey} onRemove={cartRemoveByKey} onDelete={cartDeleteByKey} onClose={() => { setCartOpen(false); setCartSoldoutActive(false); }} onOrder={initiateOrder} soldoutMenuIds={soldoutMenuIds} soldoutActive={cartSoldoutActive} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {historyOpen && (
+          <OrderHistorySheet orders={orderHistory} cart={cart} onClose={() => setHistoryOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {staffCallOpen && (
+          <StaffCallSheet onClose={() => setStaffCallOpen(false)} onConfirm={callStaff} />
+        )}
+      </AnimatePresence>
+
+      {/* ── Order Processing Overlay ── */}
+      <AnimatePresence>
+        {orderProcessing && <OrderProcessingOverlay />}
+      </AnimatePresence>
+
+      {/* ── Order Error Screen ── */}
+      <AnimatePresence>
+        {orderError && (
+          <OrderErrorScreen
+            type={orderError}
+            duplicateTime={duplicateTime}
+            onGoMain={() => { setOrderError(null); setCartOpen(false); }}
+            onRetry={() => { setOrderError(null); doOrder(cart); }}
+            onHistory={() => { setOrderError(null); setHistoryOpen(true); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Soldout Alert Modal ── */}
+      <AnimatePresence>
+        {soldoutModal && (
+          <SoldoutModal items={soldoutItems} onClose={() => { setSoldoutModal(false); setCartSoldoutActive(true); }} />
+        )}
+      </AnimatePresence>
+
+      {/* ── Network Error Screen ── */}
+      <AnimatePresence>
+        {networkError && (
+          <NetworkErrorScreen onRetry={() => {
+            if (navigator.onLine) setNetworkError(false);
+          }} />
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

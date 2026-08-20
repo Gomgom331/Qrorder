@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
-import { ScanLine, UtensilsCrossed, ShoppingBag, ChevronRight } from 'lucide-react';
+import { ScanLine, UtensilsCrossed, ShoppingBag, ChevronRight, Shield, Store } from 'lucide-react';
 
 export function CustomerQRScan() {
   const navigate = useNavigate();
@@ -131,6 +131,24 @@ export function CustomerQRScan() {
         <p className="text-center text-white/40 text-xs">
           Powered by QR Order © 2026
         </p>
+
+        {/* Admin / Client nav */}
+        <div className="flex gap-2">
+          <a
+            href="/login"
+            className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-[4px] border border-white/25 bg-white/10 text-white text-xs font-medium hover:bg-white/20 transition-colors"
+          >
+            <Shield size={12} />
+            관리자 페이지
+          </a>
+          <a
+            href="/client/login"
+            className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-[4px] border border-white/25 bg-white/10 text-white text-xs font-medium hover:bg-white/20 transition-colors"
+          >
+            <Store size={12} />
+            클라이언트 페이지
+          </a>
+        </div>
       </div>
     </div>
   );
