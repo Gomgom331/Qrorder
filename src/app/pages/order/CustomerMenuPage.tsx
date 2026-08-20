@@ -1719,12 +1719,11 @@ export function CustomerMenuPage() {
             {[...CATEGORIES, TEST_CATEGORY].map(cat => {
               const isActive = selectedCategory === cat;
               const isTest = cat === TEST_CATEGORY;
-              const hasSoldoutInCat = !isTest && cat !== '전체' && MENU_ITEMS.some(m => m.category === cat && soldoutMenuIds.has(m.id));
               return (
                 <button
                   key={cat}
                   onClick={() => isTest ? setSelectedCategory(TEST_CATEGORY) : scrollToCategory(cat)}
-                  className={`relative h-7 px-3 sm:px-3.5 rounded-[4px] text-xs font-medium whitespace-nowrap shrink-0 transition-colors touch-manipulation ${
+                  className={`h-7 px-3 sm:px-3.5 rounded-[4px] text-xs font-medium whitespace-nowrap shrink-0 transition-colors touch-manipulation ${
                     isActive
                       ? isTest ? 'text-white bg-violet-500' : 'text-white'
                       : isTest ? 'bg-violet-50 text-violet-600 border border-violet-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1732,9 +1731,6 @@ export function CustomerMenuPage() {
                   style={isActive && !isTest ? { background: PRIMARY } : {}}
                 >
                   {cat}
-                  {hasSoldoutInCat && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 border border-white" />
-                  )}
                 </button>
               );
             })}
