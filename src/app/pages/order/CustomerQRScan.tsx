@@ -1,11 +1,34 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ScanLine, UtensilsCrossed, ShoppingBag, ChevronRight, Shield, Store } from 'lucide-react';
+import { AppLoadingScreen } from '@/app/components/AppLoadingScreen';
 
 export function CustomerQRScan() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
+    <>
+      <AnimatePresence>
+        {loading && (
+          <motion.div
+            key="app-loading"
+            className="fixed inset-0 z-50"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35 }}
+          >
+            <AppLoadingScreen />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     <div className="min-h-screen bg-gradient-to-b from-[#FF6B2B] via-[#E85D20] to-[#C74E18] flex flex-col items-center justify-between py-10 px-6 overflow-hidden relative">
 
       {/* Decorative shapes */}
@@ -151,5 +174,6 @@ export function CustomerQRScan() {
         </div>
       </div>
     </div>
+    </>
   );
 }
