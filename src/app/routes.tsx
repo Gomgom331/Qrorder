@@ -61,6 +61,7 @@ import { ClientMenuCardGuide } from './pages/client/ClientMenuCardGuide';
 // Customer order pages
 import { CustomerQRScan } from './pages/order/CustomerQRScan';
 import { CustomerMenuPage } from './pages/order/CustomerMenuPage';
+import { InvalidQRPage } from './pages/order/InvalidQRPage';
 
 // Order Status Management
 import OrderStatusManagement from './pages/OrderStatusManagement';
@@ -71,6 +72,7 @@ export const router = createBrowserRouter([
   { path: '/client/login', Component: ClientLogin },
   // Customer front-office (standalone, no admin layout)
   { path: '/order', Component: CustomerQRScan },
+  { path: '/order/invalid', Component: InvalidQRPage },
   { path: '/order/:storeId/table/:tableId', Component: CustomerMenuPage },
   {
     path: '/',
