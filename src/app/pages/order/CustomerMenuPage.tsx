@@ -1396,7 +1396,7 @@ function StaffCallSheet({
         </div>
 
         {/* Footer */}
-        <div className="px-4 pb-8 pt-3 border-t border-slate-100 shrink-0">
+        <div className="px-4 py-5 border-t border-slate-100 shrink-0">
           <button
             onClick={handleConfirm}
             disabled={!hasAny}
