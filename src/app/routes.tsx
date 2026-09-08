@@ -34,6 +34,7 @@ import { PaginationGuide } from './pages/PaginationGuide';
 import { TreeGuide } from './pages/TreeGuide';
 import { TableGuide } from './pages/TableGuide';
 import { TokenGuide } from './pages/TokenGuide';
+import { ConsumerGuide } from './pages/order/ConsumerGuide';
 import { LogoExport } from './pages/LogoExport';
 import { ColorGuide } from './pages/ColorGuide';
 import { FileUploadGuide } from './pages/FileUploadGuide';
@@ -117,6 +118,7 @@ export const router = createBrowserRouter([
       { path: 'ui/tree', Component: TreeGuide },
       { path: 'ui/table', Component: TableGuide },
       { path: 'ui/token', Component: TokenGuide },
+      { path: 'ui/consumer', Component: ConsumerGuide },
       { path: 'ui/logo', Component: LogoExport },
       { path: 'ui/colors', Component: ColorGuide },
       { path: 'ui/file-upload', Component: FileUploadGuide },
