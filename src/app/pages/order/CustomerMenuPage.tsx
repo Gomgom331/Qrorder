@@ -1316,16 +1316,16 @@ function OrderCompleteScreen({ onConfirm }: { onConfirm: () => void }) {
 
 // ─── Staff Call Items ─────────────────────────────────────────────
 const STAFF_CALL_ITEMS = [
-  { id: 'water',    label: '물' },
-  { id: 'plate',   label: '앞접시' },
-  { id: 'cup',      label: '컵' },
-  { id: 'napkin',   label: '냅킨' },
-  { id: 'wetTowel', label: '물티슈' },
-  { id: 'spoon',    label: '수저' },
-  { id: 'fork',     label: '젓가락' },
-  { id: 'banchan',  label: '반찬추가' },
-  { id: 'sauce',    label: '소스추가' },
-] as const;
+  { id: 'water',    label: '물',      showQty: true  },
+  { id: 'plate',    label: '앞접시',  showQty: true  },
+  { id: 'cup',      label: '컵',      showQty: true  },
+  { id: 'napkin',   label: '냅킨',    showQty: true  },
+  { id: 'wetTowel', label: '물티슈',  showQty: true  },
+  { id: 'spoon',    label: '수저',    showQty: true  },
+  { id: 'fork',     label: '젓가락',  showQty: true  },
+  { id: 'banchan',  label: '반찬추가', showQty: false },
+  { id: 'sauce',    label: '소스추가', showQty: false },
+];
 
 // ─── Staff Call Sheet ─────────────────────────────────────────────
 function StaffCallSheet({
@@ -1334,18 +1334,33 @@ function StaffCallSheet({
   onClose: () => void;
   onConfirm: (summary: string) => void;
 }) {
-  // qty-map for regular items (id → qty, 0 = not selected)
+  // 공통 on/off 상태
+  const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
+  // 수량 (showQty:true 아이템, on 상태일 때만 유효)
   const [itemQty, setItemQty] = useState<Record<string, number>>({});
-  // 직원호출 toggle
   const [staffToggle, setStaffToggle] = useState(false);
 
-  const addItem = (id: string) => {
-    setItemQty(prev => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+  // 칩 토글 — 모든 아이템 공통 on/off
+  const toggleItem = (id: string, showQty: boolean) => {
+    setActiveIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        if (showQty) setItemQty(p => { const { [id]: _, ...r } = p; return r; });
+      } else {
+        next.add(id);
+        if (showQty) setItemQty(p => ({ ...p, [id]: 1 }));
+      }
+      return next;
+    });
   };
+
+  // 수량 조절 (리스트 내부, showQty:true 전용)
   const changeQty = (id: string, delta: number) => {
     setItemQty(prev => {
-      const next = (prev[id] ?? 0) + delta;
+      const next = (prev[id] ?? 1) + delta;
       if (next <= 0) {
+        setActiveIds(p => { const s = new Set(p); s.delete(id); return s; });
         const { [id]: _, ...rest } = prev;
         return rest;
       }
@@ -1353,15 +1368,20 @@ function StaffCallSheet({
     });
   };
 
-  const selectedItems = STAFF_CALL_ITEMS.filter(i => (itemQty[i.id] ?? 0) > 0);
-  const hasAny = selectedItems.length > 0 || staffToggle;
+  // 활성화된 아이템 (원래 순서 유지)
+  const activeItems = STAFF_CALL_ITEMS.filter(i => activeIds.has(i.id));
+  const hasAny = activeItems.length > 0 || staffToggle;
 
   const handleConfirm = () => {
     const parts: string[] = [];
     if (staffToggle) parts.push('직원호출');
-    selectedItems.forEach(i => {
-      const q = itemQty[i.id];
-      parts.push(q > 1 ? `${i.label} ${q}개` : i.label);
+    activeItems.forEach(i => {
+      if (i.showQty) {
+        const q = itemQty[i.id] ?? 1;
+        parts.push(q > 1 ? `${i.label} ${q}개` : i.label);
+      } else {
+        parts.push(i.label);
+      }
     });
     onConfirm(parts.join(', '));
     onClose();
@@ -1413,23 +1433,38 @@ function StaffCallSheet({
         </div>
 
         <div className="subtle-box flex-1 px-4 pb-2">
-          {/* Chips — 일반 아이템만 */}
+          {/* Chips — 공통 토글 */}
           <div className="flex flex-wrap gap-2 pt-3 mb-4">
-            {STAFF_CALL_ITEMS.map(item => (
-              <button
-                key={item.id}
-                onClick={() => addItem(item.id)}
-                className="h-9 px-3.5 flex items-center gap-1.5 rounded-full border border-slate-200 bg-white text-slate-700 text-sm font-medium transition-colors active:bg-slate-50 touch-manipulation"
-              >
-                <Plus size={12} className="text-slate-400" strokeWidth={2.5} />
-                {item.label}
-              </button>
-            ))}
+            {STAFF_CALL_ITEMS.map(item => {
+              const isOn = activeIds.has(item.id);
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => toggleItem(item.id, item.showQty)}
+                  className="h-9 px-3.5 flex items-center gap-1.5 rounded-full border text-sm font-medium transition-all touch-manipulation"
+                  style={isOn
+                    ? { background: `${PRIMARY}12`, borderColor: `${PRIMARY}40`, color: PRIMARY }
+                    : { background: '#fff', borderColor: '#e2e8f0', color: '#475569' }
+                  }
+                >
+                  {item.showQty
+                    ? <Plus size={12} strokeWidth={2.5} style={{ color: isOn ? PRIMARY : '#94a3b8' }} />
+                    : <Check size={12} strokeWidth={2.5} style={{ color: isOn ? PRIMARY : '#94a3b8' }} />
+                  }
+                  {item.label}
+                  {item.showQty && isOn && (
+                    <span className="font-bold tabular-nums" style={{ color: PRIMARY }}>
+                      {itemQty[item.id] ?? 1}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Selected items list */}
+          {/* 선택된 아이템 리스트 */}
           <AnimatePresence>
-            {selectedItems.length > 0 && (
+            {activeItems.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
@@ -1438,11 +1473,12 @@ function StaffCallSheet({
                 className="overflow-hidden"
               >
                 <div className="border-t border-slate-100 pt-3 space-y-1">
-                  {selectedItems.map(item => {
-                    const qty = itemQty[item.id] ?? 0;
+                  {activeItems.map(item => {
+                    const qty = itemQty[item.id] ?? 1;
                     return (
                       <div key={item.id} className="flex items-center h-10 gap-2">
                         <span className="flex-1 text-slate-700 text-sm font-medium">{item.label}</span>
+                        {item.showQty && (
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             onClick={() => changeQty(item.id, -1)}
@@ -1462,6 +1498,7 @@ function StaffCallSheet({
                             <Plus size={11} strokeWidth={2.5} />
                           </button>
                         </div>
+                        )}
                       </div>
                     );
                   })}
