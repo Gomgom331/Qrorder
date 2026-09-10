@@ -600,34 +600,54 @@ function OrderConfirmModal({ totalPrice, onConfirm, onCancel }: {
 }) {
   return (
     <motion.div
-      className="fixed inset-0 z-[80] flex items-center justify-center px-8"
-      style={{ background: 'rgba(0,0,0,0.45)' }}
+      className="fixed inset-0 z-[80] flex items-center justify-center px-6"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onCancel}
     >
       <motion.div
-        className="bg-white rounded-[12px] w-full max-w-[280px] px-6 py-6 shadow-2xl"
-        initial={{ scale: 0.92, opacity: 0 }}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="order-confirm-title"
+        className="bg-white rounded-[12px] w-full max-w-[280px] flex flex-col p-[24px] drop-shadow-[0px_25px_25px_rgba(0,0,0,0.25)]"
+        initial={{ scale: 0.94, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
         onClick={e => e.stopPropagation()}
       >
-        <p className="font-semibold text-[16px] text-[#1d293d] text-center mb-1">주문하시겠습니까?</p>
-        <p className="text-[13px] text-[#90a1b9] text-center mb-5">
-          총 결제 금액&nbsp;
-          <span className="font-bold" style={{ color: PRIMARY }}>{totalPrice.toLocaleString()}원</span>
+        {/* Title */}
+        <p
+          id="order-confirm-title"
+          className="font-semibold text-[15px] text-[#222] text-center w-full"
+        >
+          주문하시겠습니까?
         </p>
-        <div className="flex gap-2">
+
+        {/* Total row */}
+        <div className="py-[16px] w-full">
+          <div className="bg-[#f8fafc] flex items-center gap-[6px] px-[12px] py-[10px] rounded-[8px] w-full">
+            <p className="text-[12px] text-[#45556c] leading-[18px] shrink-0">총 결제 금액</p>
+            <div className="flex flex-1 items-start justify-end min-w-0">
+              <p className="font-bold text-[11px] text-[#ff6467] leading-[16.5px] whitespace-nowrap">
+                {totalPrice.toLocaleString()}원
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-[4px] w-full">
           <button
+            type="button"
             onClick={onCancel}
-            className="flex-1 h-11 rounded-[6px] font-semibold text-sm bg-slate-100 text-slate-600 active:bg-slate-200 transition-colors"
+            className="flex-1 h-[40px] bg-[#f1f5f9] rounded-[6px] font-semibold text-[15px] text-[#475569] hover:bg-[#e2e8f0] transition-colors"
           >
             취소
           </button>
           <button
+            type="button"
             onClick={onConfirm}
-            className="flex-1 h-11 rounded-[6px] font-semibold text-sm text-white transition-colors"
-            style={{ background: PRIMARY }}
+            className="flex-1 h-[40px] bg-[#ff6b2b] rounded-[6px] font-semibold text-[15px] text-white transition-colors"
             onMouseEnter={e => { e.currentTarget.style.background = PRIMARY_HOVER; }}
             onMouseLeave={e => { e.currentTarget.style.background = PRIMARY; }}
           >
@@ -1935,16 +1955,22 @@ export function CustomerMenuPage() {
         {staffCalled && (
           <motion.div
             initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10 }}
-            className="fixed top-4 left-4 right-4 max-w-sm mx-auto z-50"
+            className="fixed top-4 left-4 right-4 z-50"
           >
             <div className="bg-slate-800 text-white px-4 py-3 rounded-[8px] flex items-center gap-3 shadow-xl">
               <div className="w-8 h-8 rounded-[6px] flex items-center justify-center shrink-0" style={{ background: PRIMARY }}>
                 <Bell size={15} className="animate-bounce" />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm">직원 호출 완료</p>
                 <p className="text-slate-400 text-xs mt-0.5">{staffCallMsg && `${staffCallMsg} · `}잠시만 기다려 주세요</p>
               </div>
+              <button
+                onClick={() => setStaffCalled(false)}
+                className="w-6 h-6 flex items-center justify-center rounded-[4px] text-slate-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+              >
+                <X size={14} />
+              </button>
             </div>
           </motion.div>
         )}

@@ -1,0 +1,207 @@
+lement.style {
+}
+<style>
+@media (prefers-reduced-motion: no-preference) {
+    .order-confirm-modal {
+        animation: order-confirm-modal-pop-in 0.2s ease-out;
+    }
+}
+<style>
+.order-confirm-modal {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 17.5rem;
+    padding: var(--spacing-10);
+    border-radius: var(--radius-2xl);
+    background-color: var(--color-bg-surface);
+    box-shadow: var(--shadow-modal);
+}
+<style>
+html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, big, cite, code, del, dfn, em, img, ins, kbd, q, s, samp, small, strike, strong, sub, sup, tt, var, b, u, i, center, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, textarea, article, aside, canvas, details, embed, figure, figcaption, footer, header, hgroup, menu, nav, output, ruby, section, summary, time, mark, audio, video, button, select, input, option {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-size: 100%;
+    font: inherit;
+    vertical-align: baseline;
+    text-decoration: none;
+}
+<style>
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+사용자 에이전트 스타일시트
+div {
+    display: block;
+    unicode-bidi: isolate;
+}
+<style>
+body {
+    font-family: var(--typography-font-base);
+    font-size: var(--typography-size-body);
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-app);
+}
+<style>
+body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, /* Mac/iOS */ 'Malgun Gothic', '맑은 고딕', /* Windows 한글 */ 'Apple SD Gothic Neo', /* Mac/iOS 한글 */ sans-serif;
+}
+<style>
+body {
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+<style>
+:root {
+    --color-brand-default: var(--orange-60);
+    --color-brand-hover: var(--orange-70);
+    --color-brand-active: var(--orange-80);
+    --color-brand-focus-ring: rgba(255, 107, 43, 0.2);
+    --color-error-focus-ring: rgba(239, 68, 68, 0.2);
+    --color-success-focus-ring: rgba(16, 185, 129, 0.2);
+    --color-brand-disabled: rgba(255, 107, 43, 0.4);
+    --color-brand-text: var(--white);
+    --color-brand-subtle: var(--orange-10);
+    --color-bg-app: var(--slate-20);
+    --color-bg-surface: var(--white);
+    --color-bg-muted: var(--slate-10);
+    --color-bg-overlay: rgba(0, 0, 0, 0.5);
+    --color-bg-hover: var(--slate-10);
+    --color-bg-selected: var(--orange-10);
+    --color-text-primary: var(--slate-90);
+    --color-text-secondary: var(--slate-70);
+    --color-text-tertiary: var(--slate-60);
+    --color-text-disabled: var(--slate-50);
+    --color-text-placeholder: var(--slate-40);
+    --color-text-on-brand: var(--white);
+    --color-text-inverse: var(--white);
+    --color-border-default: var(--slate-30);
+    --color-border-hover: var(--slate-50);
+    --color-border-focus: var(--orange-60);
+    --input-focus-border: var(--color-border-focus);
+    --color-border-error: var(--red-40);
+    --color-border-success: var(--emerald-40);
+    --color-border-divider: var(--slate-20);
+    --color-border-brand: rgba(255, 107, 43, 0.145);
+    --color-status-error-default: var(--red-50);
+    --color-status-error-bg: var(--red-20);
+    --color-status-error-bg-subtle: var(--red-10);
+    --color-status-error-border-subtle: var(--red-30);
+    --color-status-error-text: #E7000B;
+    --color-status-success-default: var(--emerald-50);
+    --color-status-success-bg: var(--emerald-20);
+    --color-status-success-bg-subtle: var(--emerald-10);
+    --color-status-success-border-subtle: var(--emerald-30);
+    --color-status-success-text: var(--emerald-80);
+    --color-status-warning-default: var(--amber-50);
+    --color-status-warning-bg: var(--amber-20);
+    --color-status-warning-bg-subtle: var(--amber-10);
+    --color-status-warning-border-subtle: var(--amber-30);
+    --color-status-warning-text: var(--amber-80);
+    --color-status-info-default: var(--blue-50);
+    --color-status-info-bg: var(--blue-20);
+    --color-status-info-bg-subtle: var(--blue-10);
+    --color-status-info-border-subtle: var(--blue-30);
+    --color-status-info-text: var(--blue-80);
+모든 속성 표시(추가 71개)
+}
+<style>
+:root {
+    --slate-0: #FFFFFF;
+    --slate-10: #F8FAFC;
+    --slate-20: #F1F5F9;
+    --slate-30: #E2E8F0;
+    --slate-40: #CBD5E1;
+    --slate-50: #94A3B8;
+    --slate-60: #64748B;
+    --slate-70: #475569;
+    --slate-80: #334155;
+    --slate-90: #1E293B;
+    --slate-100: #0F172A;
+    --orange-0: #FFFFFF;
+    --orange-10: #FFF4EF;
+    --orange-20: #FFE4D4;
+    --orange-30: #FFCDB0;
+    --orange-40: #FFB088;
+    --orange-50: #FF8F5A;
+    --orange-60: #FF6B2B;
+    --orange-70: #E85D20;
+    --orange-80: #D15118;
+    --orange-90: #A03A0A;
+    --orange-100: #6B2200;
+    --red-0: #FFFFFF;
+    --red-10: #FFF5F5;
+    --red-20: #FEE2E2;
+    --red-30: #FECACA;
+    --red-40: #F87171;
+    --red-50: #EF4444;
+    --red-60: #DC2626;
+    --red-70: #B91C1C;
+    --red-80: #991B1B;
+    --red-90: #7F1D1D;
+    --red-100: #450A0A;
+    --emerald-0: #FFFFFF;
+    --emerald-10: #ECFDF5;
+    --emerald-20: #D1FAE5;
+    --emerald-30: #A7F3D0;
+    --emerald-40: #34D399;
+    --emerald-50: #10B981;
+    --emerald-60: #059669;
+    --emerald-70: #047857;
+    --emerald-80: #065F46;
+    --emerald-90: #064E3B;
+    --emerald-100: #022C22;
+    --amber-0: #FFFFFF;
+    --amber-10: #FFFBEB;
+    --amber-20: #FEF3C7;
+    --amber-30: #FDE68A;
+    --amber-40: #FCD34D;
+    --amber-50: #F59E0B;
+모든 속성 표시(추가 147개)
+}
+<style>
+html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+}
+<style>
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+<style>
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+<style>
+::-webkit-scrollbar {
+    width: var(--spacing-2);
+    height: var(--spacing-2);
+}
+<style>
+::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-default);
+    border-radius: var(--radius-pill);
+}
+<style>
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+<style>
+0% {
+    opacity: 0;
+    transform: scale(0.94);
+}
+<style>
+100% {
+    opacity: 1;
+    transform: scale(1);
+}
+<style>
+@font-face {
+    font-family: 'Pretendard';
+    src: url(/static/fonts/Pretendard-Thin.woff2) format('woff2');
+    font-weight: 100;
+    font-style: normal;
+    font-display: swap;
