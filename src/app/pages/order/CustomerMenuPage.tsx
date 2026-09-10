@@ -11,6 +11,7 @@ import {
 
 // ─── Design System constants ─────────────────────────────────────
 const PRIMARY = '#FF6B2B';
+const PRIMARY_HOVER = '#E85D20';
 
 // ─── Types ────────────────────────────────────────────────────────
 type Phase = 'loading' | 'menu' | 'complete' | 'session-timeout' | 'session-closed';
@@ -593,6 +594,51 @@ function MenuDetailSheet({
   );
 }
 
+// ─── Order Confirm Modal ──────────────────────────────────────────
+function OrderConfirmModal({ totalPrice, onConfirm, onCancel }: {
+  totalPrice: number; onConfirm: () => void; onCancel: () => void;
+}) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[80] flex items-center justify-center px-8"
+      style={{ background: 'rgba(0,0,0,0.45)' }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={onCancel}
+    >
+      <motion.div
+        className="bg-white rounded-[12px] w-full max-w-[280px] px-6 py-6 shadow-2xl"
+        initial={{ scale: 0.92, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <p className="font-semibold text-[16px] text-[#1d293d] text-center mb-1">주문하시겠습니까?</p>
+        <p className="text-[13px] text-[#90a1b9] text-center mb-5">
+          총 결제 금액&nbsp;
+          <span className="font-bold" style={{ color: PRIMARY }}>{totalPrice.toLocaleString()}원</span>
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 h-11 rounded-[6px] font-semibold text-sm bg-slate-100 text-slate-600 active:bg-slate-200 transition-colors"
+          >
+            취소
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 h-11 rounded-[6px] font-semibold text-sm text-white transition-colors"
+            style={{ background: PRIMARY }}
+            onMouseEnter={e => { e.currentTarget.style.background = PRIMARY_HOVER; }}
+            onMouseLeave={e => { e.currentTarget.style.background = PRIMARY; }}
+          >
+            주문하기
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── Cart Sheet ───────────────────────────────────────────────────
 function CartSheet({
   cart, onAdd, onRemove, onDelete, onClose, onOrder, soldoutMenuIds, soldoutActive,
@@ -602,6 +648,7 @@ function CartSheet({
   onClose: () => void; onOrder: () => void;
   soldoutMenuIds: Set<string>; soldoutActive: boolean;
 }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const totalQty = cart.reduce((s, i) => s + i.qty, 0);
   const hasSoldout = soldoutActive && cart.some(ci => soldoutMenuIds.has(ci.menuId));
   const totalPrice = cart.reduce((s, i) => s + (i.price + i.optionPrice) * i.qty, 0);
@@ -748,16 +795,25 @@ function CartSheet({
             </button>
           ) : (
             <button
-              onClick={onOrder}
+              onClick={() => setConfirmOpen(true)}
               disabled={hasSoldout}
               className="w-full h-12 text-white rounded-[6px] font-semibold text-base flex items-center justify-center transition-all touch-manipulation"
               style={{ background: hasSoldout ? '#c1c7cd' : PRIMARY }}
-              onMouseEnter={e => { if (!hasSoldout) e.currentTarget.style.background = '#E85D20'; }}
+              onMouseEnter={e => { if (!hasSoldout) e.currentTarget.style.background = PRIMARY_HOVER; }}
               onMouseLeave={e => { if (!hasSoldout) e.currentTarget.style.background = PRIMARY; }}
             >
               주문하기
             </button>
           )}
+          <AnimatePresence>
+            {confirmOpen && (
+              <OrderConfirmModal
+                totalPrice={totalPrice}
+                onConfirm={() => { setConfirmOpen(false); onOrder(); }}
+                onCancel={() => setConfirmOpen(false)}
+              />
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
     </div>
@@ -999,7 +1055,7 @@ function OrderErrorScreen({
               onClick={onRetry}
               className="w-full h-12 text-white rounded-[6px] font-semibold text-sm touch-manipulation transition-colors"
               style={{ background: PRIMARY }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#E85D20')}
+              onMouseEnter={e => (e.currentTarget.style.background = PRIMARY_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.background = PRIMARY)}
             >
               다시 시도하기
@@ -1009,7 +1065,7 @@ function OrderErrorScreen({
               onClick={onHistory}
               className="w-full h-12 text-white rounded-[6px] font-semibold text-sm touch-manipulation transition-colors"
               style={{ background: PRIMARY }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#E85D20')}
+              onMouseEnter={e => (e.currentTarget.style.background = PRIMARY_HOVER)}
               onMouseLeave={e => (e.currentTarget.style.background = PRIMARY)}
             >
               주문내역 확인하기
@@ -1057,7 +1113,7 @@ function SoldoutModal({ items, onClose }: { items: CartItem[]; onClose: () => vo
           onClick={onClose}
           className="w-full h-10 text-white rounded-[6px] font-semibold text-sm touch-manipulation transition-colors"
           style={{ background: PRIMARY }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#E85D20')}
+          onMouseEnter={e => (e.currentTarget.style.background = PRIMARY_HOVER)}
           onMouseLeave={e => (e.currentTarget.style.background = PRIMARY)}
         >
           확인
@@ -1153,7 +1209,7 @@ function NetworkErrorScreen({ onRetry }: { onRetry: () => void }) {
           onClick={onRetry}
           className="w-full h-12 text-white rounded-[6px] font-semibold text-sm flex items-center justify-center transition-colors touch-manipulation mt-2"
           style={{ background: PRIMARY }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#E85D20')}
+          onMouseEnter={e => (e.currentTarget.style.background = PRIMARY_HOVER)}
           onMouseLeave={e => (e.currentTarget.style.background = PRIMARY)}
         >
           다시 시도하기
