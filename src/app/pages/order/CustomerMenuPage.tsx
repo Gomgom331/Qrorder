@@ -1410,13 +1410,13 @@ function StaffCallSheet({
           <div className="w-10 h-1 bg-slate-200 rounded-full" />
         </div>
 
-        {/* Header — 직원호출 토글을 헤더 우측 고정 */}
-        <div className="flex items-center px-4 py-2.5 border-b border-slate-100 shrink-0">
+        {/* Header */}
+        <div className="flex items-center gap-[8px] px-[16px] py-[10px] border-b border-slate-100 shrink-0">
           <Bell size={16} className="text-slate-600 shrink-0" />
-          <span className="font-semibold text-slate-800 text-sm ml-2 flex-1">직원호출</span>
+          <span className="font-semibold text-slate-800 text-sm flex-1">직원호출</span>
           <button
             onClick={() => setStaffToggle(t => !t)}
-            className="h-8 px-3 flex items-center gap-1.5 rounded-full border text-xs font-semibold transition-all touch-manipulation"
+            className="flex items-center gap-[6px] px-[10px] py-[4px] rounded-[9999px] border text-[12px] font-semibold transition-all touch-manipulation"
             style={staffToggle
               ? { background: PRIMARY, borderColor: PRIMARY, color: '#fff' }
               : { background: '#fff', borderColor: '#e2e8f0', color: '#64748b' }
@@ -1424,17 +1424,62 @@ function StaffCallSheet({
           >
             <Bell size={11} strokeWidth={2.5} />
             직원호출
-            {/* on/off indicator dot */}
             <span
-              className="w-1.5 h-1.5 rounded-full ml-0.5"
+              className="w-[6px] h-[6px] rounded-full shrink-0"
               style={{ background: staffToggle ? 'rgba(255,255,255,0.7)' : '#cbd5e1' }}
             />
           </button>
         </div>
 
-        <div className="subtle-box flex-1 px-4 pb-2">
-          {/* Chips — 공통 토글 */}
-          <div className="flex flex-wrap gap-2 pt-3 mb-4">
+        <div className="subtle-box flex-1 flex flex-col px-4 overflow-hidden">
+          {/* 선택된 아이템 리스트 — 칩 위에 배치 */}
+          <AnimatePresence>
+            {activeItems.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18 }}
+                className="overflow-hidden shrink-0"
+              >
+                <div className="pt-3 pb-1 space-y-0.5">
+                  {activeItems.map(item => {
+                    const qty = itemQty[item.id] ?? 1;
+                    return (
+                      <div key={item.id} className="flex items-center h-10 gap-2">
+                        <span className="flex-1 text-slate-700 text-sm font-medium">{item.label}</span>
+                        {item.showQty && (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => changeQty(item.id, -1)}
+                              className="w-7 h-7 rounded-[4px] flex items-center justify-center transition-colors touch-manipulation"
+                              style={qty === 1 ? { background: '#d72b2b' } : { background: '#f1f5f9' }}
+                            >
+                              {qty === 1
+                                ? <X size={11} className="text-white" strokeWidth={2.5} />
+                                : <Minus size={11} className="text-slate-500" strokeWidth={2.5} />
+                              }
+                            </button>
+                            <span className="text-slate-800 font-semibold text-sm w-5 text-center tabular-nums">{qty}</span>
+                            <button
+                              onClick={() => changeQty(item.id, 1)}
+                              className="w-7 h-7 bg-slate-100 rounded-[4px] flex items-center justify-center text-slate-500 touch-manipulation"
+                            >
+                              <Plus size={11} strokeWidth={2.5} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="border-b border-slate-100 mb-1" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Chips — 공통 토글, 항상 리스트 아래 고정 */}
+          <div className="flex flex-wrap gap-2 py-3">
             {STAFF_CALL_ITEMS.map(item => {
               const isOn = activeIds.has(item.id);
               return (
@@ -1461,51 +1506,6 @@ function StaffCallSheet({
               );
             })}
           </div>
-
-          {/* 선택된 아이템 리스트 */}
-          <AnimatePresence>
-            {activeItems.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.18 }}
-                className="overflow-hidden"
-              >
-                <div className="border-t border-slate-100 pt-3 space-y-1">
-                  {activeItems.map(item => {
-                    const qty = itemQty[item.id] ?? 1;
-                    return (
-                      <div key={item.id} className="flex items-center h-10 gap-2">
-                        <span className="flex-1 text-slate-700 text-sm font-medium">{item.label}</span>
-                        {item.showQty && (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            onClick={() => changeQty(item.id, -1)}
-                            className="w-7 h-7 rounded-[4px] flex items-center justify-center transition-colors touch-manipulation"
-                            style={qty === 1 ? { background: '#d72b2b' } : { background: '#f1f5f9' }}
-                          >
-                            {qty === 1
-                              ? <X size={11} className="text-white" strokeWidth={2.5} />
-                              : <Minus size={11} className="text-slate-500" strokeWidth={2.5} />
-                            }
-                          </button>
-                          <span className="text-slate-800 font-semibold text-sm w-5 text-center tabular-nums">{qty}</span>
-                          <button
-                            onClick={() => changeQty(item.id, 1)}
-                            className="w-7 h-7 bg-slate-100 rounded-[4px] flex items-center justify-center text-slate-500 touch-manipulation"
-                          >
-                            <Plus size={11} strokeWidth={2.5} />
-                          </button>
-                        </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         {/* Footer */}
