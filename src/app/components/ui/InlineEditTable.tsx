@@ -34,6 +34,8 @@ export interface InlineColumnDef<T> {
   type?: InlineColumnType;
   /** th/td 추가 className (ex. "w-20 text-center") */
   className?: string;
+  /** 헤더 텍스트 정렬 (기본: left) */
+  align?: 'left' | 'center';
   /** InputField placeholder */
   placeholder?: string;
   /** SelectField options (type='select'일 때 필수) */
@@ -145,7 +147,7 @@ export function InlineEditTable<T extends InlineRow>({
   const thCls = (col: InlineColumnDef<T>) =>
     [
       'px-3 py-2.5 text-xs font-medium text-slate-500 bg-slate-50',
-      col.type === 'checkbox' ? 'text-center' : 'text-left',
+      col.type === 'checkbox' || col.align === 'center' ? 'text-center' : 'text-left',
       col.className ?? '',
     ].join(' ');
 

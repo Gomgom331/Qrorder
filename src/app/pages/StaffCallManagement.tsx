@@ -47,6 +47,7 @@ const COLUMNS = [
     label: '선택 방식',
     type: 'select' as const,
     className: 'w-[200px]',
+    align: 'center' as const,
     options: [
       { value: '단건', label: '단건' },
       { value: '다건', label: '다건' },
@@ -57,6 +58,7 @@ const COLUMNS = [
     label: '사용 여부',
     type: 'select' as const,
     className: 'w-[130px]',
+    align: 'center' as const,
     options: [
       { value: '사용',   label: '사용'   },
       { value: '미사용', label: '미사용' },
@@ -117,7 +119,7 @@ export function StaffCallManagement() {
             />
           </div>
           <div className="flex gap-2 shrink-0">
-            <Button variant="outline" size="md" leftIcon={<RotateCcw size={14} />} onClick={handleReset}>
+            <Button variant="outline" size="md" onClick={handleReset}>
               초기화
             </Button>
             <Button variant="primary" size="md" leftIcon={<Search size={14} />} onClick={() => setAppliedSearch(search)}>
