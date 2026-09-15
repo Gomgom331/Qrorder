@@ -83,6 +83,12 @@ const navItems: NavItem[] = [
           { type: 'leaf', label: '옵션 그룹', path: '/menus/options' },
         ],
       },
+      {
+        type: 'group', label: '메뉴 정보 관리',
+        children: [
+          { type: 'leaf', label: '직원호출 관리', path: '/menus/staff-call' },
+        ],
+      },
     ],
   },
   {

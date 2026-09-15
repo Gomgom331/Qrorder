@@ -446,6 +446,70 @@ function ShadowSection() {
   );
 }
 
+function ScrollSection() {
+  const ITEMS = Array.from({ length: 12 }, (_, i) => `항목 ${i + 1}`);
+  return (
+    <Section title="스크롤 스타일" desc="theme.css에 정의된 전역 스크롤바 유틸리티 클래스">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        {/* scroll-box */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-700">.scroll-box</span>
+            <span className="text-xs text-slate-400">메인 스크롤 — 진한 스크롤바 (gray-30)</span>
+          </div>
+          <div className="scroll-box h-40 border border-slate-200 rounded-[6px] bg-white">
+            <div className="p-3 space-y-1">
+              {ITEMS.map((item) => (
+                <div key={item} className="px-3 py-2 rounded-[4px] bg-slate-50 text-xs text-slate-600">{item}</div>
+              ))}
+            </div>
+          </div>
+          <div className="text-xs text-slate-400 space-y-0.5">
+            <p><span className="font-mono text-slate-500">scrollbar-width:</span> thin</p>
+            <p><span className="font-mono text-slate-500">thumb:</span> var(--color-gray-30)</p>
+            <p><span className="font-mono text-slate-500">width:</span> 0.3rem</p>
+          </div>
+        </div>
+
+        {/* subtle-box */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-700">.subtle-box</span>
+            <span className="text-xs text-slate-400">서브 스크롤 — 연한 스크롤바 (gray-10)</span>
+          </div>
+          <div className="subtle-box h-40 border border-slate-200 rounded-[6px] bg-white">
+            <div className="p-3 space-y-1">
+              {ITEMS.map((item) => (
+                <div key={item} className="px-3 py-2 rounded-[4px] bg-slate-50 text-xs text-slate-600">{item}</div>
+              ))}
+            </div>
+          </div>
+          <div className="text-xs text-slate-400 space-y-0.5">
+            <p><span className="font-mono text-slate-500">scrollbar-width:</span> thin</p>
+            <p><span className="font-mono text-slate-500">thumb:</span> var(--color-gray-10)</p>
+            <p><span className="font-mono text-slate-500">width:</span> 0.3rem</p>
+          </div>
+        </div>
+
+      </div>
+
+      {/* 사용 지침 */}
+      <div className="mt-4 bg-slate-50 rounded-[6px] p-4 space-y-2">
+        {[
+          { cls: '.scroll-box',  where: '페이지 레벨 주요 스크롤 영역 (사이드바, 전체 목록)' },
+          { cls: '.subtle-box',  where: '컴포넌트 내부 중첩 스크롤 (바텀 시트 바디, 직원호출 시트)' },
+        ].map(({ cls, where }) => (
+          <div key={cls} className="flex items-start gap-3 text-xs">
+            <span className="font-mono bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-700 shrink-0">{cls}</span>
+            <span className="text-slate-500">{where}</span>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────
 
 export function ConsumerGuide() {
@@ -474,6 +538,7 @@ export function ConsumerGuide() {
       <AnimationSection />
       <SoldoutModalSection />
       <ShadowSection />
+      <ScrollSection />
     </div>
   );
 }

@@ -35,6 +35,7 @@ import { TreeGuide } from './pages/TreeGuide';
 import { TableGuide } from './pages/TableGuide';
 import { TokenGuide } from './pages/TokenGuide';
 import { ConsumerGuide } from './pages/order/ConsumerGuide';
+import { StaffCallManagement } from './pages/StaffCallManagement';
 import { LogoExport } from './pages/LogoExport';
 import { ColorGuide } from './pages/ColorGuide';
 import { FileUploadGuide } from './pages/FileUploadGuide';
@@ -89,6 +90,7 @@ export const router = createBrowserRouter([
       { path: 'menus', Component: MenuRegister },
       { path: 'menus/categories', Component: MenuManagement },
       { path: 'menus/options', Component: MenuManagement },
+      { path: 'menus/staff-call', Component: StaffCallManagement },
       { path: 'system/business', Component: BusinessSearch },
       { path: 'system/common-codes', Component: CommonCodeManagement },
       { path: 'system/rules', Component: RuleManagement },

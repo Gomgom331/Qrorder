@@ -1,4 +1,5 @@
-import React, { useRef, useState, useEffect, useId } from 'react';
+import React, { useRef, useState, useEffect, useId, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { ChevronDown, Check, Search, Loader2 } from 'lucide-react';
 import { InputSize, inputSizeConfig, getInputBorderClass, InputState, LabelPosition } from './InputField';
 
@@ -57,7 +58,7 @@ export function DropdownSelect({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [focused, setFocused] = useState(false);
-  const [dropUp, setDropUp] = useState(false);
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number | undefined; dropUp: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const uid = useId();
@@ -68,7 +69,6 @@ export function DropdownSelect({
   const isDisabled = disabled || forceState === 'disabled';
   const isLoading  = loading   || forceState === 'loading';
 
-  // State
   const effectiveState: InputState = (() => {
     if (forceState) return forceState;
     if (isDisabled) return 'disabled';
@@ -83,10 +83,38 @@ export function DropdownSelect({
   const s = inputSizeConfig[inputSize];
   const borderCls = getInputBorderClass(effectiveState);
 
-  // Close on outside click
+  // fixed 위치 계산
+  const calcPos = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const dropdownHeight = 260;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const dropUp = spaceBelow < dropdownHeight && rect.top > spaceBelow;
+    setDropPos({
+      top: dropUp ? rect.top - 4 : rect.bottom + 4,
+      left: rect.left,
+      width: dropdownWidth ? undefined : rect.width,
+      dropUp,
+    });
+  }, [dropdownWidth]);
+
+  // 열릴 때 위치 계산 + 스크롤/리사이즈 시 재계산
+  useEffect(() => {
+    if (!open) { setDropPos(null); return; }
+    calcPos();
+    window.addEventListener('scroll', calcPos, true);
+    window.addEventListener('resize', calcPos);
+    return () => {
+      window.removeEventListener('scroll', calcPos, true);
+      window.removeEventListener('resize', calcPos);
+    };
+  }, [open, calcPos]);
+
+  // 외부 클릭 시 닫기
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (!containerRef.current?.contains(target)) {
         setOpen(false);
         setSearch('');
       }
@@ -98,16 +126,6 @@ export function DropdownSelect({
   useEffect(() => {
     if (open && searchable) searchRef.current?.focus();
   }, [open, searchable]);
-
-  // Flip up when not enough space below
-  useEffect(() => {
-    if (!open || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const dropdownHeight = 260; // max-h-[240px] + padding
-    setDropUp(spaceBelow < dropdownHeight && spaceAbove > spaceBelow);
-  }, [open]);
 
   const handleSelect = (opt: DropdownOption) => {
     if (opt.disabled) return;
@@ -173,14 +191,20 @@ export function DropdownSelect({
         }
       </span>
 
-      {/* Dropdown */}
-      {open && (
+      {/* Dropdown — portal로 fixed 렌더링 (overflow 클리핑 방지) */}
+      {open && dropPos && ReactDOM.createPortal(
         <div
           className={[
-            `absolute z-50 bg-white border border-slate-200 rounded-[6px] shadow-lg overflow-hidden`,
-            dropdownWidth ?? 'w-full min-w-[180px]',
-            dropUp ? 'bottom-full mb-1' : 'top-full mt-1',
+            'fixed z-[9999] bg-white border border-slate-200 rounded-[6px] shadow-lg overflow-hidden',
+            dropdownWidth ?? '',
           ].join(' ')}
+          style={{
+            top: dropPos.dropUp ? undefined : dropPos.top,
+            bottom: dropPos.dropUp ? window.innerHeight - dropPos.top : undefined,
+            left: dropPos.left,
+            width: dropdownWidth ?? dropPos.width,
+            minWidth: 120,
+          }}
         >
           {/* Search */}
           {searchable && (
@@ -201,11 +225,9 @@ export function DropdownSelect({
 
           {/* Options */}
           <ul className="py-1 max-h-[240px] overflow-y-auto" role="listbox">
-            {/* Ungrouped */}
             {ungrouped.map((opt) => (
               <OptionItem key={opt.value} opt={opt} selected={selectedValue === opt.value} onSelect={handleSelect} inputSize={inputSize} />
             ))}
-            {/* Grouped */}
             {grouped.map(({ group, items }) => items.length > 0 && (
               <li key={group}>
                 <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
@@ -222,7 +244,8 @@ export function DropdownSelect({
               <li className={`px-3 py-6 text-center text-slate-400 ${s.text}`}>검색 결과 없음</li>
             )}
           </ul>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

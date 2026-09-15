@@ -11,7 +11,7 @@
  *   - 'input'          → 항상 편집 가능
  *   - 'input-readonly' → 기존 행은 readOnly, 신규 행만 편집 가능
  *   - 'checkbox'       → CheckboxField (boolean 값)
- *   - 'select'         → SelectField (options 필수)
+ *   - 'select'         → DropdownSelect (options 필수, 스타일 드롭다운)
  */
 
 import React, { useState } from 'react';
@@ -19,7 +19,7 @@ import { ChevronUp, ChevronDown, Check, Pencil } from 'lucide-react';
 import { Button } from './Button';
 import { InputField } from './InputField';
 import { CheckboxField } from './CheckboxField';
-import { SelectField } from './SelectField';
+import { DropdownSelect } from './DropdownSelect';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -144,7 +144,7 @@ export function InlineEditTable<T extends InlineRow>({
   /* ── 헤더 th className ── */
   const thCls = (col: InlineColumnDef<T>) =>
     [
-      'px-3 py-2.5 text-xs font-medium text-slate-500',
+      'px-3 py-2.5 text-xs font-medium text-slate-500 bg-slate-50',
       col.type === 'checkbox' ? 'text-center' : 'text-left',
       col.className ?? '',
     ].join(' ');
@@ -169,11 +169,11 @@ export function InlineEditTable<T extends InlineRow>({
     if (type === 'select') {
       return (
         <td key={String(col.key)} className="px-3 py-[5px]">
-          <SelectField
-            selectSize="sm"
+          <DropdownSelect
             value={String(value ?? '')}
-            onChange={(e) => updateCell(row.id, col.key, e.target.value)}
+            onChange={(val) => updateCell(row.id, col.key, val)}
             options={col.options ?? []}
+            placeholder=""
           />
         </td>
       );
@@ -183,7 +183,6 @@ export function InlineEditTable<T extends InlineRow>({
     return (
       <td key={String(col.key)} className="px-3 py-[5px]">
         <InputField
-          inputSize="sm"
           value={String(value ?? '')}
           onChange={(e) => updateCell(row.id, col.key, e.target.value)}
           placeholder={col.placeholder}
@@ -207,11 +206,6 @@ export function InlineEditTable<T extends InlineRow>({
           {badge && (
             <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-[3px]">
               {badge}
-            </span>
-          )}
-          {rows.length > 0 && (
-            <span className="text-xs bg-[#FF6B2B]/10 text-[#FF6B2B] px-2 py-0.5 rounded-[3px] font-medium">
-              {rows.length}건
             </span>
           )}
         </div>
@@ -275,14 +269,14 @@ export function InlineEditTable<T extends InlineRow>({
       {/* 테이블 */}
       <div className={scrollable ? 'flex-1 overflow-auto' : 'overflow-x-auto'}>
         <table className="w-full text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="bg-slate-50 border-b border-slate-200">
               {columns.map((col) => (
                 <th key={String(col.key)} className={thCls(col)}>
                   {col.label}
                 </th>
               ))}
-              {onEditRow && <th className="w-10 px-2 py-2.5" />}
+              {onEditRow && <th className="w-10 px-2 py-2.5 bg-slate-50" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
