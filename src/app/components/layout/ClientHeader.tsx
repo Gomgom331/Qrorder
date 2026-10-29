@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
-  Menu, Bell, ChevronDown, LogOut, User, Settings, QrCode,
-  Megaphone, Info, ChevronRight,
+  Menu, ChevronDown, LogOut, User, Settings, QrCode,
+  Megaphone, Info,
 } from 'lucide-react';
+import ClarityBellSolid from '../../../imports/ClarityBellSolid';
+import ClarityBellSolidBadged from '../../../imports/ClarityBellSolidBadged';
 
 // ─── Mock notifications (받은 알림) ──────────────────────────────
 const MOCK_CLIENT_NOTIFS = [
@@ -104,26 +106,31 @@ export function ClientHeader({ onMenuClick }: ClientHeaderProps) {
       {/* Notification bell */}
       <div className="relative" ref={notifRef}>
         <button
+          type="button"
           onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }}
           className={`relative p-1.5 rounded-[4px] transition-colors ${notifOpen ? 'bg-slate-100 text-slate-700' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
+          aria-label={unreadCount > 0 ? `읽지 않은 알림 ${unreadCount}개` : '알림'}
+          aria-haspopup="dialog"
+          aria-expanded={notifOpen}
+          aria-controls="client-notification-panel"
         >
-          <Bell size={18} />
-          {unreadCount > 0 && (
-            <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-              {unreadCount}
-            </span>
-          )}
+          {unreadCount > 0
+            ? <ClarityBellSolidBadged className="relative size-[16px]" />
+            : <ClarityBellSolid className="relative size-[16px]" />}
         </button>
 
         {/* Notification panel */}
         {notifOpen && (
           <div
-            className="absolute right-0 top-full mt-2 w-[320px] bg-white border border-slate-200 rounded-[8px] shadow-xl z-30 overflow-hidden"
+            id="client-notification-panel"
+            role="dialog"
+            aria-label="매장 알림"
+            className="absolute right-0 top-full mt-2 w-[min(320px,calc(100vw-24px))] bg-white border border-slate-200 rounded-[8px] shadow-xl z-30 overflow-hidden"
             style={{ animation: 'notifIn 0.15s ease-out' }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <Bell size={15} className="text-slate-500" />
+                <ClarityBellSolid className="relative size-[16px] shrink-0" />
                 <span className="text-sm font-semibold text-slate-800">알림</span>
                 {unreadCount > 0 && (
                   <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600">
@@ -136,7 +143,7 @@ export function ClientHeader({ onMenuClick }: ClientHeaderProps) {
               )}
             </div>
 
-            <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-50">
+            <div className="max-h-[340px] overflow-y-auto divide-y divide-slate-50">
               {notifications.map((notif) => {
                 const cfg = NOTIF_ICON[notif.type];
                 const Icon = cfg.icon;
@@ -146,7 +153,7 @@ export function ClientHeader({ onMenuClick }: ClientHeaderProps) {
                     onClick={() => {
                       setNotifications(notifications.map((n) => n.id === notif.id ? { ...n, read: true } : n));
                     }}
-                    className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left ${!notif.read ? 'bg-blue-50/40' : ''}`}
+                    className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left ${!notif.read ? 'bg-red-50/30' : ''}`}
                   >
                     <div className={`p-1.5 rounded-[6px] shrink-0 mt-0.5 ${cfg.cls}`}>
                       <Icon size={14} />
@@ -161,27 +168,13 @@ export function ClientHeader({ onMenuClick }: ClientHeaderProps) {
                       <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">{notif.body}</p>
                     </div>
                     {!notif.read && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0 mt-1.5" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FB2C36] shrink-0 mt-1.5" />
                     )}
                   </button>
                 );
               })}
             </div>
 
-            <div className="border-t border-slate-100 grid grid-cols-2 divide-x divide-slate-100">
-              <button
-                onClick={() => { setNotifOpen(false); navigate('/client/notices'); }}
-                className="flex items-center justify-center gap-1 py-2.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
-              >
-                공지 전체보기 <ChevronRight size={12} />
-              </button>
-              <button
-                onClick={() => { setNotifOpen(false); navigate('/client/inquiry'); }}
-                className="flex items-center justify-center gap-1 py-2.5 text-xs text-[#FF6B2B] hover:bg-orange-50 transition-colors"
-              >
-                문의하기 <ChevronRight size={12} />
-              </button>
-            </div>
           </div>
         )}
       </div>
